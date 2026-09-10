@@ -245,14 +245,14 @@ async def contro2(ctx):
 
     audio_file = os.path.join(
         base_folder,
-        "Joined_ultra_corrupted_extreme_harsh_fx.mp3"
+        "joined_ultra_corrupted_extreme_harsh_fx.mp3"
     )
 
     if not os.path.isfile(audio_file):
 
         await ctx.send(
             "❌ Audio file not found:\n"
-            "`Joined_ultra_corrupted_extreme_harsh_fx.mp3`"
+            "`joined_ultra_corrupted_extreme_harsh_fx.mp3`"
         )
         return
 
@@ -417,6 +417,7 @@ async def play(ctx, *, query=None):
         )
 
         if not info or "entries" not in info:
+
             await ctx.send(
                 "❌ No SoundCloud result found."
             )
@@ -425,6 +426,7 @@ async def play(ctx, *, query=None):
         entries = info.get("entries")
 
         if not entries:
+
             await ctx.send(
                 "❌ No SoundCloud result found."
             )
@@ -440,6 +442,7 @@ async def play(ctx, *, query=None):
         )
 
         if not audio_url:
+
             await ctx.send(
                 "❌ Could not get the audio stream."
             )
@@ -489,6 +492,7 @@ async def play(ctx, *, query=None):
 async def stop(ctx):
 
     if ctx.voice_client is None:
+
         await ctx.send(
             "❌ Izuna is not in a voice channel."
         )
@@ -518,6 +522,7 @@ async def stop(ctx):
 async def pause(ctx):
 
     if ctx.voice_client is None:
+
         await ctx.send(
             "❌ Izuna is not in a voice channel."
         )
@@ -547,6 +552,7 @@ async def pause(ctx):
 async def resume(ctx):
 
     if ctx.voice_client is None:
+
         await ctx.send(
             "❌ Izuna is not in a voice channel."
         )
@@ -576,6 +582,7 @@ async def resume(ctx):
 async def leave(ctx):
 
     if ctx.voice_client is None:
+
         await ctx.send(
             "❌ Izuna is not in a voice channel."
         )
@@ -654,7 +661,6 @@ async def on_command_error(ctx, error):
         await ctx.send(
             "❌ Missing command argument."
         )
-
         return
 
     print(
