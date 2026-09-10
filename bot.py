@@ -12,7 +12,7 @@ import imageio_ffmpeg
 # IZUNA CONFIG
 # =========================
 
-OWNER_ID = {
+OWNER_IDS = {
     1323235462281957457,
     1294964677419466922
 }
@@ -71,6 +71,10 @@ intents.message_content = True
 intents.voice_states = True
 
 
+# =========================
+# BOT
+# =========================
+
 bot = commands.Bot(
     command_prefix="!",
     intents=intents,
@@ -87,7 +91,11 @@ async def on_ready():
 
     print(f"IZUNA ONLINE: {bot.user}")
     print(f"Bot ID: {bot.user.id}")
-    print(f"Owner ID: {OWNER_ID}")
+
+    print("Owner IDs:")
+    for owner_id in OWNER_IDS:
+        print(f" - {owner_id}")
+
     print(f"FFmpeg: {FFMPEG_PATH}")
     print(f"Audio file: {AUDIO_FILE}")
 
@@ -98,18 +106,18 @@ async def on_ready():
 
 
 # =========================
-# OWNER ONLY
+# OWNER CHECK
 # =========================
 
 def owner_only():
 
     async def predicate(ctx):
 
-        if ctx.author.id == OWNER_ID:
+        if ctx.author.id in OWNER_IDS:
             return True
 
         await ctx.send(
-            "🛡️ **Izuna is controlled by its owner only.**"
+            "🛡️ **Izuna is controlled by its owners only.**"
         )
 
         return False
@@ -126,11 +134,9 @@ def owner_only():
 async def join(ctx):
 
     if not ctx.author.voice:
-
         await ctx.send(
             "❌ Join a voice channel first."
         )
-
         return
 
     channel = ctx.author.voice.channel
@@ -167,18 +173,16 @@ async def join(ctx):
 async def testsound(ctx):
 
     if not ctx.author.voice:
-
         await ctx.send(
             "❌ Join a voice channel first."
         )
-
         return
 
     channel = ctx.author.voice.channel
 
     try:
 
-        # Connect to voice
+        # Connect or move
         if ctx.voice_client:
 
             voice = ctx.voice_client
@@ -189,7 +193,6 @@ async def testsound(ctx):
         else:
 
             voice = await channel.connect()
-
 
         # Check audio file
         if not os.path.exists(AUDIO_FILE):
@@ -205,27 +208,23 @@ async def testsound(ctx):
 
             return
 
-
-        # Stop previous audio
+        # Stop current audio
         if voice.is_playing():
-
             voice.stop()
-
 
         # FFmpeg options
         ffmpeg_options = {
             "options": "-vn"
         }
 
-
-        # Play MP3
+        # Create audio source
         source = discord.FFmpegPCMAudio(
             AUDIO_FILE,
             executable=FFMPEG_PATH,
             **ffmpeg_options
         )
 
-
+        # Play
         voice.play(
             source,
             after=lambda error: print(
@@ -233,11 +232,9 @@ async def testsound(ctx):
             )
         )
 
-
         await ctx.send(
             "🔊 **Izuna is playing the audio!**"
         )
-
 
     except Exception as e:
 
@@ -252,7 +249,7 @@ async def testsound(ctx):
 
 
 # =========================
-# PLAY SOUNDCLOUD
+# SOUNDCLOUD PLAY
 # =========================
 
 @bot.command()
@@ -267,7 +264,6 @@ async def play(ctx, *, query=None):
 
         return
 
-
     if not ctx.author.voice:
 
         await ctx.send(
@@ -276,12 +272,11 @@ async def play(ctx, *, query=None):
 
         return
 
-
     channel = ctx.author.voice.channel
-
 
     try:
 
+        # Connect or move
         if ctx.voice_client:
 
             voice = ctx.voice_client
@@ -293,12 +288,11 @@ async def play(ctx, *, query=None):
 
             voice = await channel.connect()
 
-
         await ctx.send(
             f"🔎 Searching SoundCloud for **{query}**..."
         )
 
-
+        # yt-dlp options
         ydl_options = {
             "format": "bestaudio/best",
             "noplaylist": True,
@@ -306,14 +300,13 @@ async def play(ctx, *, query=None):
             "default_search": "scsearch1"
         }
 
-
+        # Search SoundCloud
         with yt_dlp.YoutubeDL(ydl_options) as ydl:
 
             info = ydl.extract_info(
                 f"scsearch1:{query}",
                 download=False
             )
-
 
         if not info:
 
@@ -323,7 +316,7 @@ async def play(ctx, *, query=None):
 
             return
 
-
+        # Get first result
         if "entries" in info:
 
             entries = info.get("entries")
@@ -338,13 +331,12 @@ async def play(ctx, *, query=None):
 
             info = entries[0]
 
-
         audio_url = info.get("url")
+
         title = info.get(
             "title",
             "Unknown track"
         )
-
 
         if not audio_url:
 
@@ -354,29 +346,30 @@ async def play(ctx, *, query=None):
 
             return
 
-
+        # Stop current audio
         if voice.is_playing():
-
             voice.stop()
 
-
+        # FFmpeg options
         ffmpeg_options = {
+
             "before_options": (
                 "-reconnect 1 "
                 "-reconnect_streamed 1 "
                 "-reconnect_delay_max 5"
             ),
+
             "options": "-vn"
         }
 
-
+        # Audio source
         source = discord.FFmpegPCMAudio(
             audio_url,
             executable=FFMPEG_PATH,
             **ffmpeg_options
         )
 
-
+        # Play
         voice.play(
             source,
             after=lambda error: print(
@@ -384,11 +377,9 @@ async def play(ctx, *, query=None):
             )
         )
 
-
         await ctx.send(
             f"🎵 **Now playing:** {title}"
         )
-
 
     except Exception as e:
 
@@ -410,7 +401,10 @@ async def play(ctx, *, query=None):
 @owner_only()
 async def pause(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_playing():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_playing()
+    ):
 
         ctx.voice_client.pause()
 
@@ -433,7 +427,10 @@ async def pause(ctx):
 @owner_only()
 async def resume(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_paused():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_paused()
+    ):
 
         ctx.voice_client.resume()
 
@@ -456,7 +453,10 @@ async def resume(ctx):
 @owner_only()
 async def stop(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_playing():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_playing()
+    ):
 
         ctx.voice_client.stop()
 
@@ -472,7 +472,7 @@ async def stop(ctx):
 
 
 # =========================
-# LEAVE
+# LEAVE VOICE
 # =========================
 
 @bot.command()
@@ -533,7 +533,7 @@ async def help(ctx):
 
 
 # =========================
-# ERROR HANDLER
+# COMMAND ERROR HANDLER
 # =========================
 
 @bot.event
@@ -545,13 +545,11 @@ async def on_command_error(ctx, error):
     ):
         return
 
-
     if isinstance(
         error,
         commands.CommandNotFound
     ):
         return
-
 
     print(
         "COMMAND ERROR:",
@@ -560,10 +558,12 @@ async def on_command_error(ctx, error):
 
 
 # =========================
-# START BOT
+# DISCORD TOKEN
 # =========================
 
-TOKEN = os.environ.get("DISCORD_TOKEN")
+TOKEN = os.environ.get(
+    "DISCORD_TOKEN"
+)
 
 if not TOKEN:
 
@@ -571,5 +571,9 @@ if not TOKEN:
         "DISCORD_TOKEN environment variable is missing."
     )
 
+
+# =========================
+# START BOT
+# =========================
 
 bot.run(TOKEN)
