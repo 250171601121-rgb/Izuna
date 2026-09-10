@@ -131,6 +131,7 @@ async def join(ctx):
 
 
 # =========================
+# CONTRO1
 # BOOGEYMAN SOUND
 # =========================
 
@@ -146,20 +147,14 @@ async def contro1(ctx):
 
     channel = ctx.author.voice.channel
 
-    # Join voice channel if not already connected
     if ctx.voice_client is None:
-
         voice = await channel.connect()
-
     else:
-
         voice = ctx.voice_client
 
         if voice.channel != channel:
             await voice.move_to(channel)
 
-
-    # Find the MP3 file
     base_folder = os.path.dirname(
         os.path.abspath(__file__)
     )
@@ -169,69 +164,137 @@ async def contro1(ctx):
         "BOOGEYMAN_extreme_clipped.mp3"
     )
 
-
-    # Check if file exists
     if not os.path.isfile(audio_file):
 
         await ctx.send(
             "❌ Audio file not found:\n"
             "`BOOGEYMAN_extreme_clipped.mp3`"
         )
-
         return
 
-
-    # Stop anything currently playing
     if voice.is_playing():
         voice.stop()
-
-
-    # FFmpeg settings
-    ffmpeg_options = {
-        "options": "-vn"
-    }
-
 
     try:
 
         source = discord.FFmpegPCMAudio(
             audio_file,
             executable=FFMPEG_PATH,
-            **ffmpeg_options
+            options="-vn"
         )
-
 
         def after_playing(error):
 
             if error:
                 print(
-                    f"❌ Audio playback error: {error}"
+                    f"❌ Contro1 audio error: {error}"
                 )
             else:
                 print(
-                    "✅ Boogeyman audio finished."
+                    "✅ Contro1 audio finished."
                 )
-
 
         voice.play(
             source,
             after=after_playing
         )
 
-
         await ctx.send(
-            "👹 **BOOGEYMAN SOUND PLAYING...**"
+            "👹 **CONTRO1 SOUND PLAYING...**"
         )
-
 
     except Exception as e:
 
         print(
-            f"❌ Audio error: {e}"
+            f"❌ Contro1 error: {e}"
         )
 
         await ctx.send(
-            "❌ Could not play the audio."
+            "❌ Could not play Contro1 sound."
+        )
+
+
+# =========================
+# CONTRO2
+# JOINED ULTRA CORRUPTED
+# =========================
+
+@bot.command()
+@owner_only()
+async def contro2(ctx):
+
+    if ctx.author.voice is None:
+        await ctx.send(
+            "❌ Join a voice channel first."
+        )
+        return
+
+    channel = ctx.author.voice.channel
+
+    if ctx.voice_client is None:
+        voice = await channel.connect()
+    else:
+        voice = ctx.voice_client
+
+        if voice.channel != channel:
+            await voice.move_to(channel)
+
+    base_folder = os.path.dirname(
+        os.path.abspath(__file__)
+    )
+
+    audio_file = os.path.join(
+        base_folder,
+        "Joined_ultra_corrupted_extreme_harsh_fx.mp3"
+    )
+
+    if not os.path.isfile(audio_file):
+
+        await ctx.send(
+            "❌ Audio file not found:\n"
+            "`Joined_ultra_corrupted_extreme_harsh_fx.mp3`"
+        )
+        return
+
+    if voice.is_playing():
+        voice.stop()
+
+    try:
+
+        source = discord.FFmpegPCMAudio(
+            audio_file,
+            executable=FFMPEG_PATH,
+            options="-vn"
+        )
+
+        def after_playing(error):
+
+            if error:
+                print(
+                    f"❌ Contro2 audio error: {error}"
+                )
+            else:
+                print(
+                    "✅ Contro2 audio finished."
+                )
+
+        voice.play(
+            source,
+            after=after_playing
+        )
+
+        await ctx.send(
+            "🔊 **CONTRO2 SOUND PLAYING...**"
+        )
+
+    except Exception as e:
+
+        print(
+            f"❌ Contro2 error: {e}"
+        )
+
+        await ctx.send(
+            "❌ Could not play Contro2 sound."
         )
 
 
@@ -249,31 +312,23 @@ async def testsound(ctx):
         )
         return
 
-
     channel = ctx.author.voice.channel
 
-
     if ctx.voice_client is None:
-
         voice = await channel.connect()
-
     else:
-
         voice = ctx.voice_client
 
         if voice.channel != channel:
             await voice.move_to(channel)
 
-
     if voice.is_playing():
         voice.stop()
-
 
     ffmpeg_options = {
         "before_options": "-f lavfi",
         "options": "-f s16le -ar 48000 -ac 2"
     }
-
 
     try:
 
@@ -283,14 +338,11 @@ async def testsound(ctx):
             **ffmpeg_options
         )
 
-
         voice.play(source)
-
 
         await ctx.send(
             "🔊 **Test sound playing for 5 seconds.**"
         )
-
 
     except Exception as e:
 
@@ -312,42 +364,30 @@ async def testsound(ctx):
 async def play(ctx, *, query=None):
 
     if query is None:
-
         await ctx.send(
             "❌ Usage: `!play song name`"
         )
-
         return
 
-
     if ctx.author.voice is None:
-
         await ctx.send(
             "❌ Join a voice channel first."
         )
-
         return
-
 
     channel = ctx.author.voice.channel
 
-
     if ctx.voice_client is None:
-
         voice = await channel.connect()
-
     else:
-
         voice = ctx.voice_client
 
         if voice.channel != channel:
             await voice.move_to(channel)
 
-
     await ctx.send(
         f"🔎 Searching SoundCloud for **{query}**..."
     )
-
 
     ydl_options = {
         "format": "bestaudio/best",
@@ -358,11 +398,9 @@ async def play(ctx, *, query=None):
         "source_address": "0.0.0.0"
     }
 
-
     try:
 
         loop = asyncio.get_running_loop()
-
 
         def search_soundcloud():
 
@@ -373,35 +411,26 @@ async def play(ctx, *, query=None):
                     download=False
                 )
 
-
         info = await loop.run_in_executor(
             None,
             search_soundcloud
         )
 
-
         if not info or "entries" not in info:
-
             await ctx.send(
                 "❌ No SoundCloud result found."
             )
-
             return
-
 
         entries = info.get("entries")
 
         if not entries:
-
             await ctx.send(
                 "❌ No SoundCloud result found."
             )
-
             return
 
-
         track = entries[0]
-
 
         audio_url = track.get("url")
 
@@ -410,19 +439,14 @@ async def play(ctx, *, query=None):
             "Unknown track"
         )
 
-
         if not audio_url:
-
             await ctx.send(
                 "❌ Could not get the audio stream."
             )
-
             return
-
 
         if voice.is_playing():
             voice.stop()
-
 
         ffmpeg_options = {
             "before_options": (
@@ -433,21 +457,17 @@ async def play(ctx, *, query=None):
             "options": "-vn"
         }
 
-
         source = discord.FFmpegPCMAudio(
             audio_url,
             executable=FFMPEG_PATH,
             **ffmpeg_options
         )
 
-
         voice.play(source)
-
 
         await ctx.send(
             f"🎵 Now playing: **{title}**"
         )
-
 
     except Exception as e:
 
@@ -469,13 +489,10 @@ async def play(ctx, *, query=None):
 async def stop(ctx):
 
     if ctx.voice_client is None:
-
         await ctx.send(
             "❌ Izuna is not in a voice channel."
         )
-
         return
-
 
     if ctx.voice_client.is_playing():
 
@@ -501,13 +518,10 @@ async def stop(ctx):
 async def pause(ctx):
 
     if ctx.voice_client is None:
-
         await ctx.send(
             "❌ Izuna is not in a voice channel."
         )
-
         return
-
 
     if ctx.voice_client.is_playing():
 
@@ -533,13 +547,10 @@ async def pause(ctx):
 async def resume(ctx):
 
     if ctx.voice_client is None:
-
         await ctx.send(
             "❌ Izuna is not in a voice channel."
         )
-
         return
-
 
     if ctx.voice_client.is_paused():
 
@@ -565,13 +576,10 @@ async def resume(ctx):
 async def leave(ctx):
 
     if ctx.voice_client is None:
-
         await ctx.send(
             "❌ Izuna is not in a voice channel."
         )
-
         return
-
 
     await ctx.voice_client.disconnect()
 
@@ -594,12 +602,12 @@ async def help_command(ctx):
         color=discord.Color.dark_red()
     )
 
-
     embed.add_field(
         name="🎧 Voice",
         value=(
             "`!join` — Join your voice channel\n"
             "`!contro1` — Play Boogeyman sound\n"
+            "`!contro2` — Play second sound\n"
             "`!testsound` — Test audio\n"
             "`!play <song>` — Play SoundCloud\n"
             "`!stop` — Stop audio\n"
@@ -610,11 +618,9 @@ async def help_command(ctx):
         inline=False
     )
 
-
     embed.set_footer(
         text="Izuna • Owner controlled"
     )
-
 
     await ctx.send(
         embed=embed
@@ -634,13 +640,11 @@ async def on_command_error(ctx, error):
     ):
         return
 
-
     if isinstance(
         error,
         commands.CommandNotFound
     ):
         return
-
 
     if isinstance(
         error,
@@ -653,7 +657,6 @@ async def on_command_error(ctx, error):
 
         return
 
-
     print(
         f"❌ Command error: {error}"
     )
@@ -665,12 +668,10 @@ async def on_command_error(ctx, error):
 
 TOKEN = os.getenv("DISCORD_TOKEN")
 
-
 if not TOKEN:
 
     raise RuntimeError(
         "DISCORD_TOKEN environment variable is missing."
     )
-
 
 bot.run(TOKEN)
