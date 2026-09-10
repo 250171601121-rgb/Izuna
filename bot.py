@@ -10,13 +10,20 @@ import imageio_ffmpeg
 
 
 # =========================
-# OWNER
+# OWNERS
 # =========================
 
 OWNER_IDS = {
     1323235462281957457,
     1294964677419466922
 }
+
+
+# =========================
+# FFMPEG
+# =========================
+
+FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 # =========================
@@ -70,8 +77,6 @@ bot = commands.Bot(
     help_command=None
 )
 
-FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
-
 
 # =========================
 # READY
@@ -82,9 +87,7 @@ async def on_ready():
 
     print(f"IZUNA ONLINE: {bot.user}")
     print(f"Bot ID: {bot.user.id}")
-
     print(f"Owner IDs: {OWNER_IDS}")
-
     print(f"FFmpeg: {FFMPEG_PATH}")
 
 
@@ -228,7 +231,100 @@ async def testsound(ctx):
 
 
 # =========================
-# PLAY
+# CONTRO1 SOUND
+# =========================
+
+@bot.command()
+@owner_only()
+async def contro1(ctx):
+
+    if not ctx.author.voice:
+
+        await ctx.send(
+            "❌ Join a voice channel first."
+        )
+
+        return
+
+    channel = ctx.author.voice.channel
+
+    try:
+
+        # Connect to voice
+        voice = ctx.voice_client
+
+        if voice is None:
+
+            voice = await channel.connect()
+
+        elif voice.channel != channel:
+
+            await voice.move_to(channel)
+
+        # Stop current audio
+        if voice.is_playing():
+
+            voice.stop()
+
+        # Discord CDN audio URL
+        audio_url = (
+            "https://cdn.discordapp.com/attachments/"
+            "1541427381397622794/"
+            "1547266684023345170/"
+            "boogeyman.kx4.dark.audio.mp3?"
+            "ex=6aa2cbe4&"
+            "is=6aa17a64&"
+            "hm=55ded2ab9cb7e91f19ceec7167261e86"
+            "e65fb0bff9b2b78c611fa08825845362"
+        )
+
+        # FFmpeg
+        ffmpeg_options = {
+
+            "before_options": (
+                "-reconnect 1 "
+                "-reconnect_streamed 1 "
+                "-reconnect_delay_max 5"
+            ),
+
+            "options": "-vn"
+        }
+
+        source = discord.FFmpegPCMAudio(
+            audio_url,
+            executable=FFMPEG_PATH,
+            **ffmpeg_options
+        )
+
+        # Play sound
+        voice.play(
+            source,
+            after=lambda error: print(
+                "CONTRO1 AUDIO ERROR:",
+                repr(error)
+            ) if error else print(
+                "CONTRO1 AUDIO FINISHED"
+            )
+        )
+
+        await ctx.send(
+            "🎵 **Contro1 sound started!**"
+        )
+
+    except Exception as e:
+
+        print(
+            "CONTRO1 ERROR:",
+            repr(e)
+        )
+
+        await ctx.send(
+            f"❌ **Contro1 failed.**\n```{str(e)[:1000]}```"
+        )
+
+
+# =========================
+# PLAY SOUNDCLOUD
 # =========================
 
 @bot.command()
@@ -396,7 +492,7 @@ async def play(ctx, *, query=None):
 
 
         # =========================
-        # FFMPEG AUDIO
+        # FFMPEG
         # =========================
 
         ffmpeg_options = {
@@ -573,6 +669,45 @@ async def leave(ctx):
 
 
 # =========================
+# HELP
+# =========================
+
+@bot.command()
+@owner_only()
+async def help(ctx):
+
+    embed = discord.Embed(
+        title="🎵 Izuna Commands",
+        description="Owner-only controls",
+        color=discord.Color.blurple()
+    )
+
+    embed.add_field(
+        name="🔊 Voice",
+        value=(
+            "`!join` — Join voice\n"
+            "`!leave` — Leave voice"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🎵 Music",
+        value=(
+            "`!play <song>` — SoundCloud\n"
+            "`!contro1` — Play Contro1 sound\n"
+            "`!testsound` — Test audio\n"
+            "`!pause` — Pause\n"
+            "`!resume` — Resume\n"
+            "`!stop` — Stop"
+        ),
+        inline=False
+    )
+
+    await ctx.send(embed=embed)
+
+
+# =========================
 # ERRORS
 # =========================
 
@@ -602,7 +737,7 @@ async def on_command_error(ctx, error):
 
 
 # =========================
-# START
+# DISCORD TOKEN
 # =========================
 
 TOKEN = os.getenv(
