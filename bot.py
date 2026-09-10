@@ -12,7 +12,10 @@ import imageio_ffmpeg
 # IZUNA CONFIG
 # =========================
 
-OWNER_ID = 1323235462281957457
+OWNER_ID = {
+    1323235462281957457,
+    1294964677419466922
+}
 
 FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
