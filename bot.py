@@ -131,13 +131,15 @@ async def join(ctx):
 
     try:
 
-        if ctx.voice_client:
+        voice = ctx.voice_client
 
-            await ctx.voice_client.move_to(channel)
-
-        else:
+        if voice is None:
 
             await channel.connect()
+
+        elif voice.channel != channel:
+
+            await voice.move_to(channel)
 
         await ctx.send(
             f"🔊 Izuna joined **{channel.name}**!"
@@ -151,7 +153,131 @@ async def join(ctx):
         )
 
         await ctx.send(
-            "❌ Could not join voice."
+            f"❌ Could not join voice.\n```{str(e)[:1000]}```"
+        )
+
+
+# =========================
+# CONTRO1 SOUND
+# =========================
+
+@bot.command()
+@owner_only()
+async def contro1(ctx):
+
+    if not ctx.author.voice:
+
+        await ctx.send(
+            "❌ Join a voice channel first."
+        )
+
+        return
+
+    channel = ctx.author.voice.channel
+
+    try:
+
+        # Connect or move
+        voice = ctx.voice_client
+
+        if voice is None:
+
+            voice = await channel.connect()
+
+        elif voice.channel != channel:
+
+            await voice.move_to(channel)
+
+
+        # Stop existing audio
+        if voice.is_playing():
+
+            voice.stop()
+
+
+        # MP3 file
+        audio_file = os.path.join(
+            os.path.dirname(
+                os.path.abspath(__file__)
+            ),
+            "boogeyman.kx4.dark.audio.mp3"
+        )
+
+
+        # Check file
+        if not os.path.exists(audio_file):
+
+            await ctx.send(
+                "❌ **MP3 file not found.**\n"
+                "Make sure `boogeyman.kx4.dark.audio.mp3` "
+                "is in the same folder as `bot.py`."
+            )
+
+            print(
+                "MP3 NOT FOUND:",
+                audio_file
+            )
+
+            return
+
+
+        print(
+            "Playing:",
+            audio_file
+        )
+
+
+        # FFmpeg options
+        ffmpeg_options = {
+            "options": "-vn"
+        }
+
+
+        # Create audio source
+        source = discord.FFmpegPCMAudio(
+            audio_file,
+            executable=FFMPEG_PATH,
+            **ffmpeg_options
+        )
+
+
+        # Play
+        def audio_finished(error):
+
+            if error:
+
+                print(
+                    "CONTRO1 AUDIO ERROR:",
+                    repr(error)
+                )
+
+            else:
+
+                print(
+                    "CONTRO1 AUDIO FINISHED"
+                )
+
+
+        voice.play(
+            source,
+            after=audio_finished
+        )
+
+
+        await ctx.send(
+            "🎵 **Contro1 sound started!**"
+        )
+
+
+    except Exception as e:
+
+        print(
+            "CONTRO1 ERROR:",
+            repr(e)
+        )
+
+        await ctx.send(
+            f"❌ **Contro1 failed.**\n```{str(e)[:1500]}```"
         )
 
 
@@ -185,18 +311,22 @@ async def testsound(ctx):
 
             await voice.move_to(channel)
 
+
         if voice.is_playing():
 
             voice.stop()
 
+
         await ctx.send(
-            "🔊 Testing Izuna audio for 5 seconds..."
+            "🔊 Testing audio for 5 seconds..."
         )
+
 
         ffmpeg_options = {
             "before_options": "-f lavfi",
             "options": "-f s16le -ar 48000 -ac 2"
         }
+
 
         source = discord.FFmpegPCMAudio(
             "sine=frequency=1000:duration=5",
@@ -204,19 +334,22 @@ async def testsound(ctx):
             **ffmpeg_options
         )
 
+
         voice.play(
             source,
             after=lambda error: print(
-                "TEST AUDIO ERROR:",
+                "TEST SOUND ERROR:",
                 repr(error)
             ) if error else print(
-                "TEST AUDIO FINISHED"
+                "TEST SOUND FINISHED"
             )
         )
+
 
         await ctx.send(
             "✅ Test sound started."
         )
+
 
     except Exception as e:
 
@@ -226,100 +359,7 @@ async def testsound(ctx):
         )
 
         await ctx.send(
-            f"❌ Test failed:\n```{str(e)[:1000]}```"
-        )
-
-
-# =========================
-# CONTRO1 SOUND
-# =========================
-
-@bot.command()
-@owner_only()
-async def contro1(ctx):
-
-    if not ctx.author.voice:
-
-        await ctx.send(
-            "❌ Join a voice channel first."
-        )
-
-        return
-
-    channel = ctx.author.voice.channel
-
-    try:
-
-        # Connect to voice
-        voice = ctx.voice_client
-
-        if voice is None:
-
-            voice = await channel.connect()
-
-        elif voice.channel != channel:
-
-            await voice.move_to(channel)
-
-        # Stop current audio
-        if voice.is_playing():
-
-            voice.stop()
-
-        # Discord CDN audio URL
-        audio_url = (
-            "https://cdn.discordapp.com/attachments/"
-            "1541427381397622794/"
-            "1547266684023345170/"
-            "boogeyman.kx4.dark.audio.mp3?"
-            "ex=6aa2cbe4&"
-            "is=6aa17a64&"
-            "hm=55ded2ab9cb7e91f19ceec7167261e86"
-            "e65fb0bff9b2b78c611fa08825845362"
-        )
-
-        # FFmpeg
-        ffmpeg_options = {
-
-            "before_options": (
-                "-reconnect 1 "
-                "-reconnect_streamed 1 "
-                "-reconnect_delay_max 5"
-            ),
-
-            "options": "-vn"
-        }
-
-        source = discord.FFmpegPCMAudio(
-            audio_url,
-            executable=FFMPEG_PATH,
-            **ffmpeg_options
-        )
-
-        # Play sound
-        voice.play(
-            source,
-            after=lambda error: print(
-                "CONTRO1 AUDIO ERROR:",
-                repr(error)
-            ) if error else print(
-                "CONTRO1 AUDIO FINISHED"
-            )
-        )
-
-        await ctx.send(
-            "🎵 **Contro1 sound started!**"
-        )
-
-    except Exception as e:
-
-        print(
-            "CONTRO1 ERROR:",
-            repr(e)
-        )
-
-        await ctx.send(
-            f"❌ **Contro1 failed.**\n```{str(e)[:1000]}```"
+            f"❌ Test failed.\n```{str(e)[:1000]}```"
         )
 
 
@@ -339,6 +379,7 @@ async def play(ctx, *, query=None):
 
         return
 
+
     if not query:
 
         await ctx.send(
@@ -346,6 +387,7 @@ async def play(ctx, *, query=None):
         )
 
         return
+
 
     channel = ctx.author.voice.channel
 
@@ -366,6 +408,7 @@ async def play(ctx, *, query=None):
 
             await voice.move_to(channel)
 
+
     except Exception as e:
 
         print(
@@ -374,7 +417,7 @@ async def play(ctx, *, query=None):
         )
 
         await ctx.send(
-            "❌ I couldn't connect to the voice channel."
+            "❌ Could not connect to voice."
         )
 
         return
@@ -430,6 +473,7 @@ async def play(ctx, *, query=None):
                     download=False
                 )
 
+
                 if not info:
 
                     raise Exception(
@@ -462,7 +506,6 @@ async def play(ctx, *, query=None):
 
                 return {
                     "url": audio_url,
-
                     "title": info.get(
                         "title",
                         "Unknown"
@@ -482,11 +525,7 @@ async def play(ctx, *, query=None):
 
 
         print(
-            "AUDIO URL FOUND"
-        )
-
-        print(
-            "TITLE:",
+            "AUDIO FOUND:",
             title
         )
 
@@ -520,32 +559,17 @@ async def play(ctx, *, query=None):
 
 
         # =========================
-        # CALLBACK
-        # =========================
-
-        def after_play(error):
-
-            if error:
-
-                print(
-                    "AUDIO PLAY ERROR:",
-                    repr(error)
-                )
-
-            else:
-
-                print(
-                    "AUDIO FINISHED"
-                )
-
-
-        # =========================
         # PLAY
         # =========================
 
         voice.play(
             source,
-            after=after_play
+            after=lambda error: print(
+                "PLAY ERROR:",
+                repr(error)
+            ) if error else print(
+                "AUDIO FINISHED"
+            )
         )
 
 
@@ -562,8 +586,7 @@ async def play(ctx, *, query=None):
         )
 
         await ctx.send(
-            "❌ **Play failed.**\n"
-            f"```{str(e)[:1500]}```"
+            f"❌ **Play failed.**\n```{str(e)[:1500]}```"
         )
 
 
@@ -583,7 +606,7 @@ async def stop(ctx):
         ctx.voice_client.stop()
 
         await ctx.send(
-            "⏹️ Stopped."
+            "⏹️ **Stopped.**"
         )
 
     else:
@@ -609,7 +632,7 @@ async def pause(ctx):
         ctx.voice_client.pause()
 
         await ctx.send(
-            "⏸️ Paused."
+            "⏸️ **Paused.**"
         )
 
     else:
@@ -635,7 +658,7 @@ async def resume(ctx):
         ctx.voice_client.resume()
 
         await ctx.send(
-            "▶️ Resumed."
+            "▶️ **Resumed.**"
         )
 
     else:
@@ -658,7 +681,7 @@ async def leave(ctx):
         await ctx.voice_client.disconnect()
 
         await ctx.send(
-            "👋 Izuna left the voice channel."
+            "👋 **Izuna left the voice channel.**"
         )
 
     else:
@@ -682,6 +705,7 @@ async def help(ctx):
         color=discord.Color.blurple()
     )
 
+
     embed.add_field(
         name="🔊 Voice",
         value=(
@@ -691,12 +715,21 @@ async def help(ctx):
         inline=False
     )
 
+
     embed.add_field(
-        name="🎵 Music",
+        name="🎵 Audio",
         value=(
-            "`!play <song>` — SoundCloud\n"
-            "`!contro1` — Play Contro1 sound\n"
+            "`!contro1` — Play Contro1 MP3\n"
             "`!testsound` — Test audio\n"
+            "`!play <song>` — SoundCloud"
+        ),
+        inline=False
+    )
+
+
+    embed.add_field(
+        name="🎛️ Controls",
+        value=(
             "`!pause` — Pause\n"
             "`!resume` — Resume\n"
             "`!stop` — Stop"
@@ -704,11 +737,14 @@ async def help(ctx):
         inline=False
     )
 
-    await ctx.send(embed=embed)
+
+    await ctx.send(
+        embed=embed
+    )
 
 
 # =========================
-# ERRORS
+# ERROR HANDLER
 # =========================
 
 @bot.event
