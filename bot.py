@@ -1,21 +1,18 @@
+```python
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import discord
 from discord.ext import commands
-import yt_dlp
-import imageio_ffmpeg
+import requests
 
 
 # =========================
-# SETTINGS
+# OWNER
 # =========================
 
 OWNER_ID = 1323235462281957457
-TOKEN = os.getenv("DISCORD_TOKEN")
-
-FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 # =========================
@@ -55,7 +52,7 @@ threading.Thread(
 
 
 # =========================
-# DISCORD
+# DISCORD BOT
 # =========================
 
 intents = discord.Intents.default()
@@ -70,6 +67,15 @@ bot = commands.Bot(
 
 
 # =========================
+# SPOTIFY SETTINGS
+# =========================
+
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
+SPOTIFY_ACCESS_TOKEN = os.getenv("SPOTIFY_ACCESS_TOKEN")
+
+
+# =========================
 # READY
 # =========================
 
@@ -79,6 +85,16 @@ async def on_ready():
     print(f"IZUNA ONLINE: {bot.user}")
     print(f"Bot ID: {bot.user.id}")
     print(f"Owner ID: {OWNER_ID}")
+
+    if SPOTIFY_CLIENT_ID:
+        print("Spotify Client ID configured.")
+    else:
+        print("Spotify Client ID missing.")
+
+    if SPOTIFY_ACCESS_TOKEN:
+        print("Spotify access token configured.")
+    else:
+        print("Spotify access token missing.")
 
 
 # =========================
@@ -102,243 +118,371 @@ def owner_only():
 
 
 # =========================
-# JOIN
+# SPOTIFY SEARCH
 # =========================
 
 @bot.command()
 @owner_only()
-async def join(ctx):
-
-    if not ctx.author.voice:
-
-        await ctx.send(
-            "❌ Join a voice channel first."
-        )
-
-        return
-
-    channel = ctx.author.voice.channel
-
-    if ctx.voice_client:
-
-        await ctx.voice_client.move_to(channel)
-
-    else:
-
-        await channel.connect()
-
-    await ctx.send(
-        f"🔊 Joined **{channel.name}**"
-    )
-
-
-# =========================
-# PLAY SOUNDCLOUD
-# =========================
-
-@bot.command()
-@owner_only()
-async def play(ctx, *, query=None):
+async def spotify(ctx, *, query=None):
 
     if not query:
-
         await ctx.send(
-            "❌ Use: `!play song name`"
+            "❌ Use: `!spotify song name`"
         )
-
         return
 
-    if not ctx.author.voice:
-
+    if not SPOTIFY_ACCESS_TOKEN:
         await ctx.send(
-            "❌ Join a voice channel first."
+            "❌ Spotify access token is not configured."
         )
-
         return
 
-    voice = ctx.voice_client
+    headers = {
+        "Authorization":
+            f"Bearer {SPOTIFY_ACCESS_TOKEN}"
+    }
 
-    if not voice:
-
-        voice = await ctx.author.voice.channel.connect()
-
-    if voice.is_playing():
-
-        voice.stop()
-
-    await ctx.send(
-        f"🔎 Searching SoundCloud for **{query}**..."
-    )
-
-    ydl_opts = {
-
-        "format": "bestaudio/best",
-
-        "noplaylist": True,
-
-        "quiet": True,
-
-        "no_warnings": True,
-
+    params = {
+        "q": query,
+        "type": "track",
+        "limit": 1
     }
 
     try:
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-
-            info = ydl.extract_info(
-                f"scsearch1:{query}",
-                download=False
-            )
-
-            if not info.get("entries"):
-
-                await ctx.send(
-                    "❌ No SoundCloud track found."
-                )
-
-                return
-
-            track = info["entries"][0]
-
-            audio_url = track["url"]
-
-            title = track.get(
-                "title",
-                "Unknown"
-            )
-
-            webpage_url = track.get(
-                "webpage_url",
-                ""
-            )
-
-        ffmpeg_options = {
-
-            "before_options":
-                "-reconnect 1 "
-                "-reconnect_streamed 1 "
-                "-reconnect_delay_max 5",
-
-            "options":
-                "-vn"
-
-        }
-
-        source = discord.FFmpegPCMAudio(
-            audio_url,
-            executable=FFMPEG_PATH,
-            **ffmpeg_options
+        response = requests.get(
+            "https://api.spotify.com/v1/search",
+            headers=headers,
+            params=params,
+            timeout=15
         )
 
-        voice.play(source)
+        if response.status_code != 200:
+
+            await ctx.send(
+                f"❌ Spotify search failed: "
+                f"`HTTP {response.status_code}`"
+            )
+
+            print(
+                "SPOTIFY SEARCH ERROR:",
+                response.text
+            )
+
+            return
+
+        data = response.json()
+
+        tracks = data.get(
+            "tracks",
+            {}
+        ).get(
+            "items",
+            []
+        )
+
+        if not tracks:
+
+            await ctx.send(
+                "❌ No Spotify track found."
+            )
+
+            return
+
+        track = tracks[0]
+
+        name = track["name"]
+
+        artists = ", ".join(
+            artist["name"]
+            for artist in track["artists"]
+        )
+
+        spotify_url = track["external_urls"]["spotify"]
 
         await ctx.send(
-            f"▶️ **Now playing:** {title}\n"
-            f"🔗 {webpage_url}"
+            "🎵 **Spotify Result**\n\n"
+            f"**Song:** {name}\n"
+            f"**Artist:** {artists}\n"
+            f"🔗 {spotify_url}"
         )
 
     except Exception as e:
 
         print(
-            "SOUNDCLOUD PLAY ERROR:",
+            "SPOTIFY ERROR:",
             repr(e)
         )
 
         await ctx.send(
-            "❌ This SoundCloud track could not be played."
+            "❌ Spotify error."
         )
 
 
 # =========================
-# STOP
+# PLAY ON SPOTIFY
 # =========================
 
 @bot.command()
 @owner_only()
-async def stop(ctx):
+async def spotifyplay(ctx, *, query=None):
 
-    if ctx.voice_client and ctx.voice_client.is_playing():
+    if not query:
+        await ctx.send(
+            "❌ Use: `!spotifyplay song name`"
+        )
+        return
 
-        ctx.voice_client.stop()
+    if not SPOTIFY_ACCESS_TOKEN:
+        await ctx.send(
+            "❌ Spotify access token is not configured."
+        )
+        return
+
+    headers = {
+        "Authorization":
+            f"Bearer {SPOTIFY_ACCESS_TOKEN}",
+        "Content-Type":
+            "application/json"
+    }
+
+    # Search
+    params = {
+        "q": query,
+        "type": "track",
+        "limit": 1
+    }
+
+    try:
+
+        search_response = requests.get(
+            "https://api.spotify.com/v1/search",
+            headers=headers,
+            params=params,
+            timeout=15
+        )
+
+        if search_response.status_code != 200:
+
+            await ctx.send(
+                "❌ Spotify search failed."
+            )
+
+            print(
+                search_response.text
+            )
+
+            return
+
+        data = search_response.json()
+
+        tracks = data.get(
+            "tracks",
+            {}
+        ).get(
+            "items",
+            []
+        )
+
+        if not tracks:
+
+            await ctx.send(
+                "❌ Song not found on Spotify."
+            )
+
+            return
+
+        track = tracks[0]
+
+        track_uri = track["uri"]
+
+        name = track["name"]
+
+        artists = ", ".join(
+            artist["name"]
+            for artist in track["artists"]
+        )
+
+        spotify_url = track["external_urls"]["spotify"]
+
+        # Start Spotify playback
+        play_response = requests.put(
+            "https://api.spotify.com/v1/me/player/play",
+            headers=headers,
+            json={
+                "uris": [track_uri]
+            },
+            timeout=15
+        )
+
+        if play_response.status_code == 204:
+
+            await ctx.send(
+                "▶️ **Spotify playback started!**\n\n"
+                f"🎵 **{name}**\n"
+                f"👤 **{artists}**\n"
+                f"🔗 {spotify_url}"
+            )
+
+        elif play_response.status_code == 403:
+
+            await ctx.send(
+                "❌ Spotify requires a Premium account "
+                "for playback control."
+            )
+
+        elif play_response.status_code == 404:
+
+            await ctx.send(
+                "❌ No active Spotify device found.\n\n"
+                "Open Spotify on your phone or PC "
+                "and start a Spotify device first."
+            )
+
+        else:
+
+            await ctx.send(
+                f"❌ Spotify playback failed.\n"
+                f"HTTP `{play_response.status_code}`"
+            )
+
+            print(
+                "PLAYBACK ERROR:",
+                play_response.text
+            )
+
+    except Exception as e:
+
+        print(
+            "SPOTIFY PLAY ERROR:",
+            repr(e)
+        )
 
         await ctx.send(
-            "⏹️ Music stopped."
+            "❌ Spotify playback error."
+        )
+
+
+# =========================
+# PAUSE SPOTIFY
+# =========================
+
+@bot.command()
+@owner_only()
+async def spotify_pause(ctx):
+
+    if not SPOTIFY_ACCESS_TOKEN:
+
+        await ctx.send(
+            "❌ Spotify access token is missing."
+        )
+
+        return
+
+    headers = {
+        "Authorization":
+            f"Bearer {SPOTIFY_ACCESS_TOKEN}"
+    }
+
+    response = requests.put(
+        "https://api.spotify.com/v1/me/player/pause",
+        headers=headers,
+        timeout=15
+    )
+
+    if response.status_code == 204:
+
+        await ctx.send(
+            "⏸️ Spotify paused."
         )
 
     else:
 
         await ctx.send(
-            "❌ Nothing is playing."
+            f"❌ Could not pause Spotify. "
+            f"HTTP `{response.status_code}`"
         )
 
 
 # =========================
-# PAUSE
+# RESUME SPOTIFY
 # =========================
 
 @bot.command()
 @owner_only()
-async def pause(ctx):
+async def spotify_resume(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_playing():
-
-        ctx.voice_client.pause()
+    if not SPOTIFY_ACCESS_TOKEN:
 
         await ctx.send(
-            "⏸️ Music paused."
+            "❌ Spotify access token is missing."
+        )
+
+        return
+
+    headers = {
+        "Authorization":
+            f"Bearer {SPOTIFY_ACCESS_TOKEN}"
+    }
+
+    response = requests.put(
+        "https://api.spotify.com/v1/me/player/play",
+        headers=headers,
+        timeout=15
+    )
+
+    if response.status_code == 204:
+
+        await ctx.send(
+            "▶️ Spotify resumed."
         )
 
     else:
 
         await ctx.send(
-            "❌ Nothing is playing."
+            f"❌ Could not resume Spotify. "
+            f"HTTP `{response.status_code}`"
         )
 
 
 # =========================
-# RESUME
+# NEXT SONG
 # =========================
 
 @bot.command()
 @owner_only()
-async def resume(ctx):
+async def spotify_next(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_paused():
-
-        ctx.voice_client.resume()
+    if not SPOTIFY_ACCESS_TOKEN:
 
         await ctx.send(
-            "▶️ Music resumed."
+            "❌ Spotify access token is missing."
+        )
+
+        return
+
+    headers = {
+        "Authorization":
+            f"Bearer {SPOTIFY_ACCESS_TOKEN}"
+    }
+
+    response = requests.post(
+        "https://api.spotify.com/v1/me/player/next",
+        headers=headers,
+        timeout=15
+    )
+
+    if response.status_code == 204:
+
+        await ctx.send(
+            "⏭️ Skipped to next song."
         )
 
     else:
 
         await ctx.send(
-            "❌ Music is not paused."
-        )
-
-
-# =========================
-# LEAVE
-# =========================
-
-@bot.command()
-@owner_only()
-async def leave(ctx):
-
-    if ctx.voice_client:
-
-        await ctx.voice_client.disconnect()
-
-        await ctx.send(
-            "👋 Izuna left the voice channel."
-        )
-
-    else:
-
-        await ctx.send(
-            "❌ Izuna is not in a voice channel."
+            f"❌ Could not skip. "
+            f"HTTP `{response.status_code}`"
         )
 
 
@@ -349,10 +493,16 @@ async def leave(ctx):
 @bot.event
 async def on_command_error(ctx, error):
 
-    if isinstance(error, commands.CheckFailure):
+    if isinstance(
+        error,
+        commands.CheckFailure
+    ):
         return
 
-    if isinstance(error, commands.CommandNotFound):
+    if isinstance(
+        error,
+        commands.CommandNotFound
+    ):
         return
 
     print(
@@ -365,12 +515,19 @@ async def on_command_error(ctx, error):
 # START
 # =========================
 
+TOKEN = os.getenv(
+    "DISCORD_TOKEN"
+)
+
 if not TOKEN:
 
     raise RuntimeError(
         "DISCORD_TOKEN is not configured."
     )
 
-print("🚀 Starting Izuna...")
+print(
+    "🚀 Starting Izuna..."
+)
 
 bot.run(TOKEN)
+```
