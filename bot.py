@@ -31,6 +31,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def start_web_server():
+
     port = int(os.environ.get("PORT", 10000))
 
     server = HTTPServer(
@@ -102,7 +103,7 @@ def owner_only():
             return True
 
         await ctx.send(
-            "🛡️ Izuna is controlled by its owner only."
+            "🛡️ **Izuna is controlled by its owner only.**"
         )
 
         return False
@@ -258,7 +259,7 @@ async def spotifyplay(ctx, *, query=None):
         if search_response.status_code != 200:
 
             print(
-                "SEARCH ERROR:",
+                "SPOTIFY SEARCH ERROR:",
                 search_response.text
             )
 
@@ -287,6 +288,7 @@ async def spotifyplay(ctx, *, query=None):
         track = tracks[0]
 
         track_uri = track["uri"]
+
         name = track["name"]
 
         artists = ", ".join(
@@ -334,7 +336,7 @@ async def spotifyplay(ctx, *, query=None):
         else:
 
             print(
-                "PLAYBACK ERROR:",
+                "SPOTIFY PLAYBACK ERROR:",
                 play_response.text
             )
 
@@ -356,7 +358,7 @@ async def spotifyplay(ctx, *, query=None):
 
 
 # =========================
-# SPOTIFY PAUSE
+# PAUSE
 # =========================
 
 @bot.command()
@@ -364,9 +366,11 @@ async def spotifyplay(ctx, *, query=None):
 async def spotify_pause(ctx):
 
     if not SPOTIFY_ACCESS_TOKEN:
+
         await ctx.send(
             "❌ Spotify access token is missing."
         )
+
         return
 
     headers = {
@@ -374,27 +378,41 @@ async def spotify_pause(ctx):
         f"Bearer {SPOTIFY_ACCESS_TOKEN}"
     }
 
-    response = requests.put(
-        "https://api.spotify.com/v1/me/player/pause",
-        headers=headers,
-        timeout=15
-    )
+    try:
 
-    if response.status_code == 204:
-
-        await ctx.send(
-            "⏸️ Spotify paused."
+        response = requests.put(
+            "https://api.spotify.com/v1/me/player/pause",
+            headers=headers,
+            timeout=15
         )
 
-    else:
+        if response.status_code == 204:
+
+            await ctx.send(
+                "⏸️ Spotify paused."
+            )
+
+        else:
+
+            await ctx.send(
+                f"❌ Could not pause Spotify "
+                f"({response.status_code})."
+            )
+
+    except Exception as e:
+
+        print(
+            "PAUSE ERROR:",
+            repr(e)
+        )
 
         await ctx.send(
-            "❌ Could not pause Spotify."
+            "❌ Spotify pause error."
         )
 
 
 # =========================
-# SPOTIFY RESUME
+# RESUME
 # =========================
 
 @bot.command()
@@ -402,9 +420,11 @@ async def spotify_pause(ctx):
 async def spotify_resume(ctx):
 
     if not SPOTIFY_ACCESS_TOKEN:
+
         await ctx.send(
             "❌ Spotify access token is missing."
         )
+
         return
 
     headers = {
@@ -412,27 +432,41 @@ async def spotify_resume(ctx):
         f"Bearer {SPOTIFY_ACCESS_TOKEN}"
     }
 
-    response = requests.put(
-        "https://api.spotify.com/v1/me/player/play",
-        headers=headers,
-        timeout=15
-    )
+    try:
 
-    if response.status_code == 204:
-
-        await ctx.send(
-            "▶️ Spotify resumed."
+        response = requests.put(
+            "https://api.spotify.com/v1/me/player/play",
+            headers=headers,
+            timeout=15
         )
 
-    else:
+        if response.status_code == 204:
+
+            await ctx.send(
+                "▶️ Spotify resumed."
+            )
+
+        else:
+
+            await ctx.send(
+                f"❌ Could not resume Spotify "
+                f"({response.status_code})."
+            )
+
+    except Exception as e:
+
+        print(
+            "RESUME ERROR:",
+            repr(e)
+        )
 
         await ctx.send(
-            "❌ Could not resume Spotify."
+            "❌ Spotify resume error."
         )
 
 
 # =========================
-# SPOTIFY NEXT
+# NEXT
 # =========================
 
 @bot.command()
@@ -440,9 +474,11 @@ async def spotify_resume(ctx):
 async def spotify_next(ctx):
 
     if not SPOTIFY_ACCESS_TOKEN:
+
         await ctx.send(
             "❌ Spotify access token is missing."
         )
+
         return
 
     headers = {
@@ -450,22 +486,36 @@ async def spotify_next(ctx):
         f"Bearer {SPOTIFY_ACCESS_TOKEN}"
     }
 
-    response = requests.post(
-        "https://api.spotify.com/v1/me/player/next",
-        headers=headers,
-        timeout=15
-    )
+    try:
 
-    if response.status_code == 204:
-
-        await ctx.send(
-            "⏭️ Next Spotify song."
+        response = requests.post(
+            "https://api.spotify.com/v1/me/player/next",
+            headers=headers,
+            timeout=15
         )
 
-    else:
+        if response.status_code == 204:
+
+            await ctx.send(
+                "⏭️ Next Spotify song."
+            )
+
+        else:
+
+            await ctx.send(
+                f"❌ Could not skip "
+                f"({response.status_code})."
+            )
+
+    except Exception as e:
+
+        print(
+            "NEXT ERROR:",
+            repr(e)
+        )
 
         await ctx.send(
-            "❌ Could not skip the song."
+            "❌ Spotify next-song error."
         )
 
 
@@ -495,7 +545,7 @@ async def on_command_error(ctx, error):
 
 
 # =========================
-# START
+# START BOT
 # =========================
 
 TOKEN = os.getenv(
