@@ -1,10 +1,47 @@
 import os
 import asyncio
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import discord
 from discord.ext import commands
 import yt_dlp
 import imageio_ffmpeg
+
+
+# =========================
+# RENDER WEB SERVER
+# =========================
+
+class HealthHandler(BaseHTTPRequestHandler):
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"Izuna is running!")
+
+    def log_message(self, format, *args):
+        pass
+
+
+def start_web_server():
+    port = int(os.environ.get("PORT", 10000))
+
+    server = HTTPServer(
+        ("0.0.0.0", port),
+        HealthHandler
+    )
+
+    print(f"🌐 Web server running on port {port}")
+    server.serve_forever()
+
+
+# Start Render web server in background
+threading.Thread(
+    target=start_web_server,
+    daemon=True
+).start()
 
 
 # =========================
@@ -88,7 +125,6 @@ async def play(ctx, *, query=None):
     elif voice.channel != ctx.author.voice.channel:
         await voice.move_to(ctx.author.voice.channel)
 
-    # Stop currently playing audio
     if voice.is_playing():
         voice.stop()
 
@@ -107,18 +143,29 @@ async def play(ctx, *, query=None):
         loop = asyncio.get_running_loop()
 
         def get_audio():
+
             with yt_dlp.YoutubeDL(ydl_options) as ydl:
-                info = ydl.extract_info(query, download=False)
+
+                info = ydl.extract_info(
+                    query,
+                    download=False
+                )
 
                 if "entries" in info:
                     info = info["entries"][0]
 
                 return info
 
-        info = await loop.run_in_executor(None, get_audio)
+        info = await loop.run_in_executor(
+            None,
+            get_audio
+        )
 
         audio_url = info["url"]
-        title = info.get("title", "Unknown")
+        title = info.get(
+            "title",
+            "Unknown"
+        )
 
         ffmpeg_options = {
             "before_options": (
@@ -137,11 +184,17 @@ async def play(ctx, *, query=None):
 
         voice.play(source)
 
-        await ctx.send(f"🎵 Now playing: **{title}**")
+        await ctx.send(
+            f"🎵 Now playing: **{title}**"
+        )
 
     except Exception as e:
+
         print(f"PLAY ERROR: {e}")
-        await ctx.send("❌ I couldn't play that audio.")
+
+        await ctx.send(
+            "❌ I couldn't play that audio."
+        )
 
 
 # =========================
@@ -152,9 +205,13 @@ async def play(ctx, *, query=None):
 @moderator_only()
 async def stop(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_playing():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_playing()
+    ):
         ctx.voice_client.stop()
         await ctx.send("⏹️ Stopped the audio.")
+
     else:
         await ctx.send("❌ Nothing is playing.")
 
@@ -169,9 +226,14 @@ async def leave(ctx):
 
     if ctx.voice_client:
         await ctx.voice_client.disconnect()
-        await ctx.send("👋 Izuna left the voice channel.")
+        await ctx.send(
+            "👋 Izuna left the voice channel."
+        )
+
     else:
-        await ctx.send("❌ I'm not in a voice channel.")
+        await ctx.send(
+            "❌ I'm not in a voice channel."
+        )
 
 
 # =========================
@@ -182,11 +244,17 @@ async def leave(ctx):
 @moderator_only()
 async def pause(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_playing():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_playing()
+    ):
         ctx.voice_client.pause()
         await ctx.send("⏸️ Paused.")
+
     else:
-        await ctx.send("❌ Nothing is playing.")
+        await ctx.send(
+            "❌ Nothing is playing."
+        )
 
 
 # =========================
@@ -197,11 +265,17 @@ async def pause(ctx):
 @moderator_only()
 async def resume(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_paused():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_paused()
+    ):
         ctx.voice_client.resume()
         await ctx.send("▶️ Resumed.")
+
     else:
-        await ctx.send("❌ Audio isn't paused.")
+        await ctx.send(
+            "❌ Audio isn't paused."
+        )
 
 
 # =========================
@@ -211,26 +285,45 @@ async def resume(ctx):
 @bot.event
 async def on_command_error(ctx, error):
 
-    if isinstance(error, commands.MissingPermissions):
+    if isinstance(
+        error,
+        commands.MissingPermissions
+    ):
+
         await ctx.send(
             "🛡️ **Moderator only.** "
-            "You don't have permission to use this command."
+            "You don't have permission "
+            "to use this command."
         )
 
-    elif isinstance(error, commands.CommandNotFound):
+    elif isinstance(
+        error,
+        commands.CommandNotFound
+    ):
+
         pass
 
     else:
-        print(f"ERROR: {error}")
+
+        print(
+            f"ERROR: {error}"
+        )
 
 
 # =========================
 # START BOT
 # =========================
 
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = os.getenv(
+    "DISCORD_TOKEN"
+)
 
 if not TOKEN:
-    raise RuntimeError("❌ DISCORD_TOKEN is not configured.")
+
+    raise RuntimeError(
+        "❌ DISCORD_TOKEN is not configured."
+    )
+
+print("🚀 Starting Izuna...")
 
 bot.run(TOKEN)
