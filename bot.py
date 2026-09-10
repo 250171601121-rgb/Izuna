@@ -57,6 +57,7 @@ threading.Thread(
 # =========================
 
 intents = discord.Intents.default()
+
 intents.message_content = True
 intents.voice_states = True
 
@@ -111,7 +112,11 @@ def owner_only():
 async def join(ctx):
 
     if not ctx.author.voice:
-        await ctx.send("❌ Join a voice channel first.")
+
+        await ctx.send(
+            "❌ Join a voice channel first."
+        )
+
         return
 
     channel = ctx.author.voice.channel
@@ -119,8 +124,11 @@ async def join(ctx):
     try:
 
         if ctx.voice_client:
+
             await ctx.voice_client.move_to(channel)
+
         else:
+
             await channel.connect()
 
         await ctx.send(
@@ -129,7 +137,10 @@ async def join(ctx):
 
     except Exception as e:
 
-        print("JOIN ERROR:", repr(e))
+        print(
+            "JOIN ERROR:",
+            repr(e)
+        )
 
         await ctx.send(
             "❌ Could not join voice."
@@ -145,52 +156,127 @@ async def join(ctx):
 async def testsound(ctx):
 
     if not ctx.author.voice:
-        await ctx.send("❌ Join a voice channel first.")
+
+        await ctx.send(
+            "❌ Join a voice channel first."
+        )
+
         return
 
     channel = ctx.author.voice.channel
 
     try:
 
+        # =========================
+        # CONNECT TO VOICE
+        # =========================
+
         voice = ctx.voice_client
 
         if voice is None:
+
             voice = await channel.connect()
 
         elif voice.channel != channel:
+
             await voice.move_to(channel)
 
+
+        # =========================
+        # STOP OLD AUDIO
+        # =========================
+
         if voice.is_playing():
+
             voice.stop()
 
+
         await ctx.send(
-            "🔊 Testing Izuna audio for 5 seconds..."
+            "🔊 **Playing Izuna test audio...**"
         )
 
+
+        # =========================
+        # DISCORD CDN MP3
+        # =========================
+
+        audio_url = (
+            "https://cdn.discordapp.com/attachments/"
+            "1541427381397622794/"
+            "1547266684023345170/"
+            "boogeyman.kx4.dark.audio.mp3?"
+            "ex=6aa2cbe4&"
+            "is=6aa17a64&"
+            "hm=55ded2ab9cb7e91f19ceec7167261e86"
+            "e65fb0bff9b2b78c611fa08825845362"
+        )
+
+
+        # =========================
+        # FFMPEG OPTIONS
+        # =========================
+
         ffmpeg_options = {
-            "before_options": "-f lavfi",
-            "options": "-f s16le -ar 48000 -ac 2"
+
+            "before_options": (
+                "-reconnect 1 "
+                "-reconnect_streamed 1 "
+                "-reconnect_delay_max 5"
+            ),
+
+            "options": (
+                "-vn "
+                "-f s16le "
+                "-ar 48000 "
+                "-ac 2"
+            )
         }
 
+
+        # =========================
+        # CREATE AUDIO SOURCE
+        # =========================
+
         source = discord.FFmpegPCMAudio(
-            "sine=frequency=1000:duration=5",
+
+            audio_url,
+
             executable=FFMPEG_PATH,
+
             **ffmpeg_options
         )
 
+
+        # =========================
+        # PLAY AUDIO
+        # =========================
+
+        def after_play(error):
+
+            if error:
+
+                print(
+                    "TEST AUDIO ERROR:",
+                    repr(error)
+                )
+
+            else:
+
+                print(
+                    "TEST AUDIO FINISHED"
+                )
+
+
         voice.play(
             source,
-            after=lambda error: print(
-                "TEST AUDIO ERROR:",
-                repr(error)
-            ) if error else print(
-                "TEST AUDIO FINISHED"
-            )
+            after=after_play
         )
 
+
         await ctx.send(
-            "✅ Test sound started."
+            "✅ **Test audio started.**"
         )
+
 
     except Exception as e:
 
@@ -205,7 +291,7 @@ async def testsound(ctx):
 
 
 # =========================
-# PLAY
+# PLAY - SOUNDCLOUD
 # =========================
 
 @bot.command()
@@ -213,18 +299,25 @@ async def testsound(ctx):
 async def play(ctx, *, query=None):
 
     if not ctx.author.voice:
+
         await ctx.send(
             "❌ Join a voice channel first."
         )
+
         return
 
+
     if not query:
+
         await ctx.send(
             "❌ Use: `!play song name`"
         )
+
         return
 
+
     channel = ctx.author.voice.channel
+
 
     # =========================
     # CONNECT
@@ -235,10 +328,13 @@ async def play(ctx, *, query=None):
         voice = ctx.voice_client
 
         if voice is None:
+
             voice = await channel.connect()
 
         elif voice.channel != channel:
+
             await voice.move_to(channel)
+
 
     except Exception as e:
 
@@ -253,33 +349,49 @@ async def play(ctx, *, query=None):
 
         return
 
+
     # =========================
     # STOP OLD AUDIO
     # =========================
 
     if voice.is_playing():
+
         voice.stop()
+
 
     await ctx.send(
         f"🔎 Searching SoundCloud for **{query}**..."
     )
 
+
     # =========================
-    # YT-DLP
+    # YT-DLP SETTINGS
     # =========================
 
     ydl_options = {
+
         "format": "bestaudio/best",
+
         "noplaylist": True,
+
         "quiet": True,
+
         "no_warnings": True,
+
         "nocheckcertificate": True,
+
         "source_address": "0.0.0.0"
     }
+
+
+    # =========================
+    # SOUNDCLOUD SEARCH
+    # =========================
 
     try:
 
         loop = asyncio.get_running_loop()
+
 
         def search_soundcloud():
 
@@ -292,44 +404,60 @@ async def play(ctx, *, query=None):
                     download=False
                 )
 
+
                 if not info:
+
                     raise Exception(
                         "No SoundCloud result found."
                     )
+
 
                 if "entries" in info:
 
                     entries = info["entries"]
 
+
                     if not entries:
+
                         raise Exception(
                             "No SoundCloud result found."
                         )
 
+
                     info = entries[0]
+
 
                 audio_url = info.get("url")
 
+
                 if not audio_url:
+
                     raise Exception(
                         "No playable audio URL found."
                     )
 
+
                 return {
+
                     "url": audio_url,
+
                     "title": info.get(
                         "title",
                         "Unknown"
                     )
                 }
 
+
         data = await loop.run_in_executor(
             None,
             search_soundcloud
         )
 
+
         audio_url = data["url"]
+
         title = data["title"]
+
 
         print(
             "AUDIO URL FOUND"
@@ -340,16 +468,19 @@ async def play(ctx, *, query=None):
             title
         )
 
+
         # =========================
-        # FFMPEG AUDIO CONVERSION
+        # FFMPEG AUDIO
         # =========================
 
         ffmpeg_options = {
+
             "before_options": (
                 "-reconnect 1 "
                 "-reconnect_streamed 1 "
                 "-reconnect_delay_max 5"
             ),
+
             "options": (
                 "-vn "
                 "-f s16le "
@@ -358,11 +489,16 @@ async def play(ctx, *, query=None):
             )
         }
 
+
         source = discord.FFmpegPCMAudio(
+
             audio_url,
+
             executable=FFMPEG_PATH,
+
             **ffmpeg_options
         )
+
 
         # =========================
         # CALLBACK
@@ -383,6 +519,7 @@ async def play(ctx, *, query=None):
                     "AUDIO FINISHED"
                 )
 
+
         # =========================
         # PLAY
         # =========================
@@ -392,9 +529,11 @@ async def play(ctx, *, query=None):
             after=after_play
         )
 
+
         await ctx.send(
             f"🎵 **Now playing:** {title}"
         )
+
 
     except Exception as e:
 
@@ -424,7 +563,9 @@ async def stop(ctx):
 
         ctx.voice_client.stop()
 
-        await ctx.send("⏹️ Stopped.")
+        await ctx.send(
+            "⏹️ Stopped."
+        )
 
     else:
 
@@ -448,7 +589,9 @@ async def pause(ctx):
 
         ctx.voice_client.pause()
 
-        await ctx.send("⏸️ Paused.")
+        await ctx.send(
+            "⏸️ Paused."
+        )
 
     else:
 
@@ -472,7 +615,9 @@ async def resume(ctx):
 
         ctx.voice_client.resume()
 
-        await ctx.send("▶️ Resumed.")
+        await ctx.send(
+            "▶️ Resumed."
+        )
 
     else:
 
@@ -515,13 +660,17 @@ async def on_command_error(ctx, error):
         error,
         commands.CheckFailure
     ):
+
         return
+
 
     if isinstance(
         error,
         commands.CommandNotFound
     ):
+
         return
+
 
     print(
         "COMMAND ERROR:",
@@ -537,14 +686,17 @@ TOKEN = os.getenv(
     "DISCORD_TOKEN"
 )
 
+
 if not TOKEN:
 
     raise RuntimeError(
         "DISCORD_TOKEN is not configured."
     )
 
+
 print(
     "🚀 Starting Izuna..."
 )
+
 
 bot.run(TOKEN)
