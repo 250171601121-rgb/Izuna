@@ -10,7 +10,7 @@ import imageio_ffmpeg
 
 
 # =========================
-# YOUR DISCORD USER ID
+# OWNER
 # =========================
 
 OWNER_ID = 1323235462281957457
@@ -71,7 +71,7 @@ FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 # =========================
-# BOT READY
+# READY
 # =========================
 
 @bot.event
@@ -80,10 +80,11 @@ async def on_ready():
     print(f"IZUNA ONLINE: {bot.user}")
     print(f"Bot ID: {bot.user.id}")
     print(f"Owner ID: {OWNER_ID}")
+    print(f"FFmpeg: {FFMPEG_PATH}")
 
 
 # =========================
-# OWNER-ONLY CHECK
+# OWNER ONLY
 # =========================
 
 def owner_only():
@@ -103,7 +104,7 @@ def owner_only():
 
 
 # =========================
-# JOIN VOICE
+# JOIN
 # =========================
 
 @bot.command()
@@ -147,7 +148,83 @@ async def join(ctx):
 
 
 # =========================
-# PLAY SOUNDCLOUD MUSIC
+# TEST SOUND
+# =========================
+
+@bot.command()
+@owner_only()
+async def testsound(ctx):
+
+    if not ctx.author.voice:
+
+        await ctx.send(
+            "❌ Join a voice channel first."
+        )
+
+        return
+
+    channel = ctx.author.voice.channel
+
+    try:
+
+        voice = ctx.voice_client
+
+        if voice is None:
+
+            voice = await channel.connect()
+
+        elif voice.channel != channel:
+
+            await voice.move_to(channel)
+
+        if voice.is_playing():
+
+            voice.stop()
+
+        await ctx.send(
+            "🔊 Testing Izuna audio for 5 seconds..."
+        )
+
+        # Generate a 1000 Hz test tone
+        ffmpeg_options = {
+            "before_options": "-f lavfi",
+            "options": "-f s16le -ar 48000 -ac 2"
+        }
+
+        source = discord.FFmpegPCMAudio(
+            "sine=frequency=1000:duration=5",
+            executable=FFMPEG_PATH,
+            **ffmpeg_options
+        )
+
+        voice.play(
+            source,
+            after=lambda error: print(
+                "TEST AUDIO ERROR:",
+                repr(error)
+            ) if error else print(
+                "TEST AUDIO FINISHED"
+            )
+        )
+
+        await ctx.send(
+            "✅ Test sound started."
+        )
+
+    except Exception as e:
+
+        print(
+            "TEST SOUND ERROR:",
+            repr(e)
+        )
+
+        await ctx.send(
+            f"❌ Test failed:\n```{str(e)[:1000]}```"
+        )
+
+
+# =========================
+# PLAY SOUNDCLOUD
 # =========================
 
 @bot.command()
@@ -173,7 +250,7 @@ async def play(ctx, *, query=None):
     channel = ctx.author.voice.channel
 
     # =========================
-    # CONNECT TO VOICE
+    # CONNECT
     # =========================
 
     try:
@@ -202,7 +279,7 @@ async def play(ctx, *, query=None):
         return
 
     # =========================
-    # STOP CURRENT AUDIO
+    # STOP OLD AUDIO
     # =========================
 
     if voice.is_playing():
@@ -214,20 +291,23 @@ async def play(ctx, *, query=None):
     )
 
     # =========================
-    # YT-DLP SETTINGS
+    # YT-DLP
     # =========================
 
     ydl_options = {
-        "format": "bestaudio/best",
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "nocheckcertificate": True,
-    }
 
-    # =========================
-    # SEARCH SOUNDCLOUD
-    # =========================
+        "format": "bestaudio/best",
+
+        "noplaylist": True,
+
+        "quiet": True,
+
+        "no_warnings": True,
+
+        "nocheckcertificate": True,
+
+        "source_address": "0.0.0.0"
+    }
 
     try:
 
@@ -284,32 +364,44 @@ async def play(ctx, *, query=None):
         )
 
         audio_url = data["url"]
+
         title = data["title"]
 
-        print("AUDIO URL FOUND")
-        print("TITLE:", title)
+        print(
+            "AUDIO URL FOUND"
+        )
+
+        print(
+            "TITLE:",
+            title
+        )
 
         # =========================
         # FFMPEG
         # =========================
 
         ffmpeg_options = {
+
             "before_options": (
                 "-reconnect 1 "
                 "-reconnect_streamed 1 "
                 "-reconnect_delay_max 5"
             ),
+
             "options": "-vn"
         }
 
         source = discord.FFmpegPCMAudio(
+
             audio_url,
+
             executable=FFMPEG_PATH,
+
             **ffmpeg_options
         )
 
         # =========================
-        # AUDIO ERROR
+        # AUDIO CALLBACK
         # =========================
 
         def after_play(error):
@@ -324,7 +416,7 @@ async def play(ctx, *, query=None):
             else:
 
                 print(
-                    "Audio finished."
+                    "AUDIO FINISHED"
                 )
 
         # =========================
@@ -468,23 +560,21 @@ async def on_command_error(ctx, error):
 
         return
 
-    elif isinstance(
+    if isinstance(
         error,
         commands.CommandNotFound
     ):
 
         return
 
-    else:
-
-        print(
-            "COMMAND ERROR:",
-            repr(error)
-        )
+    print(
+        "COMMAND ERROR:",
+        repr(error)
+    )
 
 
 # =========================
-# START BOT
+# START
 # =========================
 
 TOKEN = os.getenv(
@@ -497,7 +587,8 @@ if not TOKEN:
         "DISCORD_TOKEN is not configured."
     )
 
-
-print("Starting Izuna...")
+print(
+    "🚀 Starting Izuna..."
+)
 
 bot.run(TOKEN)
