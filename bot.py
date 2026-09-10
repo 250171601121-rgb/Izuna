@@ -67,7 +67,6 @@ threading.Thread(
 # =========================
 
 intents = discord.Intents.default()
-
 intents.message_content = True
 intents.voice_states = True
 
@@ -120,11 +119,9 @@ def owner_only():
 async def join(ctx):
 
     if not ctx.author.voice:
-
         await ctx.send(
             "❌ Join a voice channel first."
         )
-
         return
 
     channel = ctx.author.voice.channel
@@ -134,11 +131,9 @@ async def join(ctx):
         voice = ctx.voice_client
 
         if voice is None:
-
             await channel.connect()
 
         elif voice.channel != channel:
-
             await voice.move_to(channel)
 
         await ctx.send(
@@ -147,10 +142,7 @@ async def join(ctx):
 
     except Exception as e:
 
-        print(
-            "JOIN ERROR:",
-            repr(e)
-        )
+        print("JOIN ERROR:", repr(e))
 
         await ctx.send(
             f"❌ Could not join voice.\n```{str(e)[:1000]}```"
@@ -177,7 +169,7 @@ async def contro1(ctx):
 
     try:
 
-        # Connect or move
+        # Connect or move to the user's channel
         voice = ctx.voice_client
 
         if voice is None:
@@ -189,51 +181,58 @@ async def contro1(ctx):
             await voice.move_to(channel)
 
 
-        # Stop existing audio
-        if voice.is_playing():
+        # Stop current audio
+        if voice.is_playing() or voice.is_paused():
 
             voice.stop()
 
 
-        # MP3 file
+        # =========================
+        # LOCAL MP3 FILE
+        # =========================
+
+        base_folder = os.path.dirname(
+            os.path.abspath(__file__)
+        )
+
         audio_file = os.path.join(
-            os.path.dirname(
-                os.path.abspath(__file__)
-            ),
+            base_folder,
             "boogeyman.kx4.dark.audio.mp3"
         )
 
 
-        # Check file
-        if not os.path.exists(audio_file):
+        print(
+            "Looking for MP3:",
+            audio_file
+        )
 
-            await ctx.send(
-                "❌ **MP3 file not found.**\n"
-                "Make sure `boogeyman.kx4.dark.audio.mp3` "
-                "is in the same folder as `bot.py`."
-            )
+
+        # Check if MP3 exists
+        if not os.path.isfile(audio_file):
 
             print(
                 "MP3 NOT FOUND:",
                 audio_file
             )
 
+            await ctx.send(
+                "❌ **MP3 file not found.**\n"
+                "Make sure this file is in the same "
+                "GitHub folder as `bot.py`:\n"
+                "`boogeyman.kx4.dark.audio.mp3`"
+            )
+
             return
 
 
-        print(
-            "Playing:",
-            audio_file
-        )
+        # =========================
+        # PLAY MP3
+        # =========================
 
-
-        # FFmpeg options
         ffmpeg_options = {
             "options": "-vn"
         }
 
-
-        # Create audio source
         source = discord.FFmpegPCMAudio(
             audio_file,
             executable=FFMPEG_PATH,
@@ -241,8 +240,7 @@ async def contro1(ctx):
         )
 
 
-        # Play
-        def audio_finished(error):
+        def after_audio(error):
 
             if error:
 
@@ -260,7 +258,12 @@ async def contro1(ctx):
 
         voice.play(
             source,
-            after=audio_finished
+            after=after_audio
+        )
+
+
+        print(
+            "CONTRO1 AUDIO STARTED"
         )
 
 
@@ -312,13 +315,13 @@ async def testsound(ctx):
             await voice.move_to(channel)
 
 
-        if voice.is_playing():
+        if voice.is_playing() or voice.is_paused():
 
             voice.stop()
 
 
         await ctx.send(
-            "🔊 Testing audio for 5 seconds..."
+            "🔊 **Testing audio for 5 seconds...**"
         )
 
 
@@ -423,11 +426,8 @@ async def play(ctx, *, query=None):
         return
 
 
-    # =========================
-    # STOP OLD AUDIO
-    # =========================
-
-    if voice.is_playing():
+    # Stop existing audio
+    if voice.is_playing() or voice.is_paused():
 
         voice.stop()
 
@@ -442,17 +442,11 @@ async def play(ctx, *, query=None):
     # =========================
 
     ydl_options = {
-
         "format": "bestaudio/best",
-
         "noplaylist": True,
-
         "quiet": True,
-
         "no_warnings": True,
-
         "nocheckcertificate": True,
-
         "source_address": "0.0.0.0"
     }
 
@@ -520,7 +514,6 @@ async def play(ctx, *, query=None):
 
 
         audio_url = data["url"]
-
         title = data["title"]
 
 
@@ -557,10 +550,6 @@ async def play(ctx, *, query=None):
             **ffmpeg_options
         )
 
-
-        # =========================
-        # PLAY
-        # =========================
 
         voice.play(
             source,
@@ -719,7 +708,7 @@ async def help(ctx):
     embed.add_field(
         name="🎵 Audio",
         value=(
-            "`!contro1` — Play Contro1 MP3\n"
+            "`!contro1` — Play MP3\n"
             "`!testsound` — Test audio\n"
             "`!play <song>` — SoundCloud"
         ),
