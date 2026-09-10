@@ -107,9 +107,7 @@ async def join(ctx):
 
         if ctx.voice_client:
 
-            await ctx.voice_client.move_to(
-                channel
-            )
+            await ctx.voice_client.move_to(channel)
 
         else:
 
@@ -127,19 +125,19 @@ async def join(ctx):
         )
 
         await ctx.send(
-            f"❌ Could not join voice: `{e}`"
+            "❌ Could not join voice."
         )
 
 
 # =========================
-# PLAY MUSIC
+# PLAY SOUNDCloud MUSIC
 # =========================
 
 @bot.command()
 @moderator_only()
 async def play(ctx, *, query=None):
 
-    # Check voice channel
+    # Check if user is in voice
     if not ctx.author.voice:
 
         await ctx.send(
@@ -148,7 +146,7 @@ async def play(ctx, *, query=None):
 
         return
 
-    # Check query
+    # Check search text
     if not query:
 
         await ctx.send(
@@ -189,7 +187,7 @@ async def play(ctx, *, query=None):
         return
 
     # =========================
-    # STOP CURRENT AUDIO
+    # STOP CURRENT MUSIC
     # =========================
 
     if voice.is_playing():
@@ -197,7 +195,7 @@ async def play(ctx, *, query=None):
         voice.stop()
 
     await ctx.send(
-        f"🔎 Searching for **{query}**..."
+        f"🔎 Searching SoundCloud for **{query}**..."
     )
 
     # =========================
@@ -210,57 +208,40 @@ async def play(ctx, *, query=None):
 
         "noplaylist": True,
 
-        "default_search": "ytsearch1",
-
         "quiet": True,
 
         "no_warnings": True,
 
-        "nocheckcertificate": True,
-
-        "source_address": "0.0.0.0",
-
-        # YouTube client workaround
-        "extractor_args": {
-
-            "youtube": {
-
-                "player_client": [
-                    "mweb"
-                ]
-
-            }
-
-        }
+        "nocheckcertificate": True
 
     }
 
     # =========================
-    # SEARCH YOUTUBE
+    # SEARCH SOUNDCLOUD
     # =========================
 
     try:
 
         loop = asyncio.get_running_loop()
 
-        def search_youtube():
+        def search_soundcloud():
 
             with yt_dlp.YoutubeDL(
                 ydl_options
             ) as ydl:
 
                 info = ydl.extract_info(
-                    f"ytsearch1:{query}",
+                    f"scsearch1:{query}",
                     download=False
                 )
 
                 if not info:
 
                     raise Exception(
-                        "No result found."
+                        "No SoundCloud result found."
                     )
 
-                # Search result
+                # Search results
                 if "entries" in info:
 
                     entries = info["entries"]
@@ -268,28 +249,38 @@ async def play(ctx, *, query=None):
                     if not entries:
 
                         raise Exception(
-                            "No YouTube result found."
+                            "No SoundCloud result found."
                         )
 
                     info = entries[0]
 
-                if not info.get("url"):
+                audio_url = info.get("url")
+
+                if not audio_url:
 
                     raise Exception(
-                        "No audio URL found."
+                        "No playable audio URL found."
                     )
 
+                title = info.get(
+                    "title",
+                    "Unknown"
+                )
+
+                webpage_url = info.get(
+                    "webpage_url",
+                    ""
+                )
+
                 return {
-                    "url": info["url"],
-                    "title": info.get(
-                        "title",
-                        "Unknown"
-                    )
+                    "url": audio_url,
+                    "title": title,
+                    "webpage_url": webpage_url
                 }
 
         data = await loop.run_in_executor(
             None,
-            search_youtube
+            search_soundcloud
         )
 
         audio_url = data["url"]
@@ -306,7 +297,7 @@ async def play(ctx, *, query=None):
         )
 
         # =========================
-        # FFMPEG
+        # FFMPEG SETTINGS
         # =========================
 
         ffmpeg_options = {
@@ -332,7 +323,7 @@ async def play(ctx, *, query=None):
         )
 
         # =========================
-        # AUDIO ERROR HANDLER
+        # AUDIO ERROR
         # =========================
 
         def after_play(error):
@@ -522,7 +513,7 @@ TOKEN = os.getenv(
 if not TOKEN:
 
     raise RuntimeError(
-        "❌ DISCORD_TOKEN is not configured."
+        "DISCORD_TOKEN is not configured."
     )
 
 
