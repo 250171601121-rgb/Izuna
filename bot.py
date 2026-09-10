@@ -26,6 +26,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def start_web_server():
+
     port = int(os.environ.get("PORT", 10000))
 
     server = HTTPServer(
@@ -33,7 +34,8 @@ def start_web_server():
         HealthHandler
     )
 
-    print(f"Web server running on port {port}")
+    print(f"🌐 Web server running on port {port}")
+
     server.serve_forever()
 
 
@@ -48,6 +50,7 @@ threading.Thread(
 # =========================
 
 intents = discord.Intents.default()
+
 intents.message_content = True
 intents.voice_states = True
 
@@ -61,13 +64,14 @@ FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 # =========================
-# READY
+# BOT READY
 # =========================
 
 @bot.event
 async def on_ready():
-    print(f"IZUNA ONLINE: {bot.user}")
-    print(f"Bot ID: {bot.user.id}")
+
+    print(f"✅ IZUNA ONLINE: {bot.user}")
+    print(f"🆔 Bot ID: {bot.user.id}")
 
 
 # =========================
@@ -75,11 +79,14 @@ async def on_ready():
 # =========================
 
 def moderator_only():
-    return commands.has_permissions(manage_messages=True)
+
+    return commands.has_permissions(
+        manage_messages=True
+    )
 
 
 # =========================
-# JOIN
+# JOIN VOICE
 # =========================
 
 @bot.command()
@@ -87,72 +94,150 @@ def moderator_only():
 async def join(ctx):
 
     if not ctx.author.voice:
-        await ctx.send("❌ Join a voice channel first.")
+
+        await ctx.send(
+            "❌ Join a voice channel first."
+        )
+
         return
 
     channel = ctx.author.voice.channel
 
     try:
+
         if ctx.voice_client:
-            await ctx.voice_client.move_to(channel)
+
+            await ctx.voice_client.move_to(
+                channel
+            )
+
         else:
+
             await channel.connect()
 
-        await ctx.send(f"🔊 Izuna joined **{channel.name}**!")
+        await ctx.send(
+            f"🔊 Izuna joined **{channel.name}**!"
+        )
 
     except Exception as e:
-        print("JOIN ERROR:", repr(e))
-        await ctx.send(f"❌ Could not join voice: `{e}`")
+
+        print(
+            "JOIN ERROR:",
+            repr(e)
+        )
+
+        await ctx.send(
+            f"❌ Could not join voice: `{e}`"
+        )
 
 
 # =========================
-# PLAY
+# PLAY MUSIC
 # =========================
 
 @bot.command()
 @moderator_only()
 async def play(ctx, *, query=None):
 
+    # Check voice channel
     if not ctx.author.voice:
-        await ctx.send("❌ Join a voice channel first.")
+
+        await ctx.send(
+            "❌ Join a voice channel first."
+        )
+
         return
 
+    # Check query
     if not query:
-        await ctx.send("❌ Use: `!play song name`")
+
+        await ctx.send(
+            "❌ Use: `!play song name`"
+        )
+
         return
 
     channel = ctx.author.voice.channel
 
-    # Connect to voice
+    # =========================
+    # CONNECT TO VOICE
+    # =========================
+
     try:
+
         voice = ctx.voice_client
 
         if voice is None:
+
             voice = await channel.connect()
 
         elif voice.channel != channel:
+
             await voice.move_to(channel)
 
     except Exception as e:
-        print("VOICE ERROR:", repr(e))
-        await ctx.send("❌ I couldn't connect to the voice channel.")
+
+        print(
+            "VOICE ERROR:",
+            repr(e)
+        )
+
+        await ctx.send(
+            "❌ I couldn't connect to the voice channel."
+        )
+
         return
 
-    # Stop previous audio
+    # =========================
+    # STOP CURRENT AUDIO
+    # =========================
+
     if voice.is_playing():
+
         voice.stop()
 
-    await ctx.send(f"🔎 Searching for **{query}**...")
+    await ctx.send(
+        f"🔎 Searching for **{query}**..."
+    )
+
+    # =========================
+    # YT-DLP SETTINGS
+    # =========================
 
     ydl_options = {
+
         "format": "bestaudio/best",
+
         "noplaylist": True,
+
         "default_search": "ytsearch1",
+
         "quiet": True,
+
         "no_warnings": True,
+
         "nocheckcertificate": True,
+
         "source_address": "0.0.0.0",
+
+        # YouTube client workaround
+        "extractor_args": {
+
+            "youtube": {
+
+                "player_client": [
+                    "mweb"
+                ]
+
+            }
+
+        }
+
     }
+
+    # =========================
+    # SEARCH YOUTUBE
+    # =========================
 
     try:
 
@@ -160,7 +245,9 @@ async def play(ctx, *, query=None):
 
         def search_youtube():
 
-            with yt_dlp.YoutubeDL(ydl_options) as ydl:
+            with yt_dlp.YoutubeDL(
+                ydl_options
+            ) as ydl:
 
                 info = ydl.extract_info(
                     f"ytsearch1:{query}",
@@ -168,19 +255,36 @@ async def play(ctx, *, query=None):
                 )
 
                 if not info:
-                    raise Exception("No result found.")
 
+                    raise Exception(
+                        "No result found."
+                    )
+
+                # Search result
                 if "entries" in info:
+
                     entries = info["entries"]
 
                     if not entries:
-                        raise Exception("No YouTube result found.")
+
+                        raise Exception(
+                            "No YouTube result found."
+                        )
 
                     info = entries[0]
 
+                if not info.get("url"):
+
+                    raise Exception(
+                        "No audio URL found."
+                    )
+
                 return {
                     "url": info["url"],
-                    "title": info.get("title", "Unknown")
+                    "title": info.get(
+                        "title",
+                        "Unknown"
+                    )
                 }
 
         data = await loop.run_in_executor(
@@ -189,30 +293,66 @@ async def play(ctx, *, query=None):
         )
 
         audio_url = data["url"]
+
         title = data["title"]
 
-        print("AUDIO URL FOUND")
-        print("TITLE:", title)
+        print(
+            "🎵 AUDIO URL FOUND"
+        )
+
+        print(
+            "TITLE:",
+            title
+        )
+
+        # =========================
+        # FFMPEG
+        # =========================
 
         ffmpeg_options = {
+
             "before_options": (
                 "-reconnect 1 "
                 "-reconnect_streamed 1 "
                 "-reconnect_delay_max 5"
             ),
+
             "options": "-vn"
+
         }
 
         source = discord.FFmpegPCMAudio(
+
             audio_url,
+
             executable=FFMPEG_PATH,
+
             **ffmpeg_options
+
         )
+
+        # =========================
+        # AUDIO ERROR HANDLER
+        # =========================
 
         def after_play(error):
 
             if error:
-                print("AUDIO PLAY ERROR:", repr(error))
+
+                print(
+                    "🔴 AUDIO PLAY ERROR:",
+                    repr(error)
+                )
+
+            else:
+
+                print(
+                    "✅ Audio finished."
+                )
+
+        # =========================
+        # PLAY
+        # =========================
 
         voice.play(
             source,
@@ -225,10 +365,14 @@ async def play(ctx, *, query=None):
 
     except Exception as e:
 
-        print("PLAY ERROR:", repr(e))
+        print(
+            "❌ PLAY ERROR:",
+            repr(e)
+        )
 
         await ctx.send(
-            f"❌ Play failed.\n```{str(e)[:1500]}```"
+            "❌ **Play failed.**\n"
+            f"```{str(e)[:1500]}```"
         )
 
 
@@ -240,15 +384,22 @@ async def play(ctx, *, query=None):
 @moderator_only()
 async def stop(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_playing():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_playing()
+    ):
 
         ctx.voice_client.stop()
 
-        await ctx.send("⏹️ Stopped.")
+        await ctx.send(
+            "⏹️ Stopped."
+        )
 
     else:
 
-        await ctx.send("❌ Nothing is playing.")
+        await ctx.send(
+            "❌ Nothing is playing."
+        )
 
 
 # =========================
@@ -259,15 +410,22 @@ async def stop(ctx):
 @moderator_only()
 async def pause(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_playing():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_playing()
+    ):
 
         ctx.voice_client.pause()
 
-        await ctx.send("⏸️ Paused.")
+        await ctx.send(
+            "⏸️ Paused."
+        )
 
     else:
 
-        await ctx.send("❌ Nothing is playing.")
+        await ctx.send(
+            "❌ Nothing is playing."
+        )
 
 
 # =========================
@@ -278,15 +436,22 @@ async def pause(ctx):
 @moderator_only()
 async def resume(ctx):
 
-    if ctx.voice_client and ctx.voice_client.is_paused():
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_paused()
+    ):
 
         ctx.voice_client.resume()
 
-        await ctx.send("▶️ Resumed.")
+        await ctx.send(
+            "▶️ Resumed."
+        )
 
     else:
 
-        await ctx.send("❌ Audio isn't paused.")
+        await ctx.send(
+            "❌ Audio isn't paused."
+        )
 
 
 # =========================
@@ -301,27 +466,40 @@ async def leave(ctx):
 
         await ctx.voice_client.disconnect()
 
-        await ctx.send("👋 Izuna left the voice channel.")
+        await ctx.send(
+            "👋 Izuna left the voice channel."
+        )
 
     else:
 
-        await ctx.send("❌ I'm not in a voice channel.")
+        await ctx.send(
+            "❌ I'm not in a voice channel."
+        )
 
 
 # =========================
-# ERRORS
+# COMMAND ERRORS
 # =========================
 
 @bot.event
-async def on_command_error(ctx, error):
+async def on_command_error(
+    ctx,
+    error
+):
 
-    if isinstance(error, commands.MissingPermissions):
+    if isinstance(
+        error,
+        commands.MissingPermissions
+    ):
 
         await ctx.send(
             "🛡️ **Moderator only.**"
         )
 
-    elif isinstance(error, commands.CommandNotFound):
+    elif isinstance(
+        error,
+        commands.CommandNotFound
+    ):
 
         pass
 
@@ -334,16 +512,23 @@ async def on_command_error(ctx, error):
 
 
 # =========================
-# START
+# START BOT
 # =========================
 
-TOKEN = os.getenv("DISCORD_TOKEN")
+TOKEN = os.getenv(
+    "DISCORD_TOKEN"
+)
 
 if not TOKEN:
+
     raise RuntimeError(
-        "DISCORD_TOKEN is not configured."
+        "❌ DISCORD_TOKEN is not configured."
     )
 
-print("🚀 Starting Izuna...")
+
+print(
+    "🚀 Starting Izuna..."
+)
+
 
 bot.run(TOKEN)
