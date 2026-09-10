@@ -1,4 +1,5 @@
 import os
+import asyncio
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
@@ -9,21 +10,10 @@ import imageio_ffmpeg
 
 
 # =========================
-# IZUNA CONFIG
+# OWNER
 # =========================
 
-OWNER_IDS = {
-    1323235462281957457,
-    1294964677419466922
-}
-
-FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
-
-AUDIO_FILE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "audio",
-    "boogeyman.kx4.dark.audio.mp3"
-)
+OWNER_ID = 1323235462281957457
 
 
 # =========================
@@ -43,6 +33,7 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def start_web_server():
+
     port = int(os.environ.get("PORT", 10000))
 
     server = HTTPServer(
@@ -62,18 +53,12 @@ threading.Thread(
 
 
 # =========================
-# DISCORD INTENTS
+# BOT SETUP
 # =========================
 
 intents = discord.Intents.default()
-
 intents.message_content = True
 intents.voice_states = True
-
-
-# =========================
-# BOT
-# =========================
 
 bot = commands.Bot(
     command_prefix="!",
@@ -81,9 +66,11 @@ bot = commands.Bot(
     help_command=None
 )
 
+FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
+
 
 # =========================
-# BOT READY
+# READY
 # =========================
 
 @bot.event
@@ -91,33 +78,23 @@ async def on_ready():
 
     print(f"IZUNA ONLINE: {bot.user}")
     print(f"Bot ID: {bot.user.id}")
-
-    print("Owner IDs:")
-    for owner_id in OWNER_IDS:
-        print(f" - {owner_id}")
-
+    print(f"Owner ID: {OWNER_ID}")
     print(f"FFmpeg: {FFMPEG_PATH}")
-    print(f"Audio file: {AUDIO_FILE}")
-
-    if os.path.exists(AUDIO_FILE):
-        print("Audio file found!")
-    else:
-        print("WARNING: Audio file NOT found!")
 
 
 # =========================
-# OWNER CHECK
+# OWNER ONLY
 # =========================
 
 def owner_only():
 
     async def predicate(ctx):
 
-        if ctx.author.id in OWNER_IDS:
+        if ctx.author.id == OWNER_ID:
             return True
 
         await ctx.send(
-            "🛡️ **Izuna is controlled by its owners only.**"
+            "🛡️ **Izuna is controlled by its owner only.**"
         )
 
         return False
@@ -126,7 +103,7 @@ def owner_only():
 
 
 # =========================
-# JOIN VOICE
+# JOIN
 # =========================
 
 @bot.command()
@@ -134,9 +111,7 @@ def owner_only():
 async def join(ctx):
 
     if not ctx.author.voice:
-        await ctx.send(
-            "❌ Join a voice channel first."
-        )
+        await ctx.send("❌ Join a voice channel first.")
         return
 
     channel = ctx.author.voice.channel
@@ -144,11 +119,8 @@ async def join(ctx):
     try:
 
         if ctx.voice_client:
-
             await ctx.voice_client.move_to(channel)
-
         else:
-
             await channel.connect()
 
         await ctx.send(
@@ -165,7 +137,7 @@ async def join(ctx):
 
 
 # =========================
-# TEST LOCAL AUDIO
+# TEST SOUND
 # =========================
 
 @bot.command()
@@ -173,208 +145,251 @@ async def join(ctx):
 async def testsound(ctx):
 
     if not ctx.author.voice:
-        await ctx.send(
-            "❌ Join a voice channel first."
-        )
+        await ctx.send("❌ Join a voice channel first.")
         return
 
     channel = ctx.author.voice.channel
 
     try:
 
-        # Connect or move
-        if ctx.voice_client:
+        voice = ctx.voice_client
 
-            voice = ctx.voice_client
-
-            if voice.channel != channel:
-                await voice.move_to(channel)
-
-        else:
-
+        if voice is None:
             voice = await channel.connect()
 
-        # Check audio file
-        if not os.path.exists(AUDIO_FILE):
+        elif voice.channel != channel:
+            await voice.move_to(channel)
 
-            await ctx.send(
-                "❌ Audio file not found on the server."
-            )
-
-            print(
-                "Missing audio file:",
-                AUDIO_FILE
-            )
-
-            return
-
-        # Stop current audio
         if voice.is_playing():
             voice.stop()
 
-        # FFmpeg options
+        await ctx.send(
+            "🔊 Testing Izuna audio for 5 seconds..."
+        )
+
         ffmpeg_options = {
-            "options": "-vn"
+            "before_options": "-f lavfi",
+            "options": "-f s16le -ar 48000 -ac 2"
         }
 
-        # Create audio source
         source = discord.FFmpegPCMAudio(
-            AUDIO_FILE,
+            "sine=frequency=1000:duration=5",
             executable=FFMPEG_PATH,
             **ffmpeg_options
         )
 
-        # Play
         voice.play(
             source,
             after=lambda error: print(
-                f"Audio finished. Error: {error}"
+                "TEST AUDIO ERROR:",
+                repr(error)
+            ) if error else print(
+                "TEST AUDIO FINISHED"
             )
         )
 
         await ctx.send(
-            "🔊 **Izuna is playing the audio!**"
+            "✅ Test sound started."
         )
 
     except Exception as e:
 
         print(
-            "TESTSOUND ERROR:",
+            "TEST SOUND ERROR:",
             repr(e)
         )
 
         await ctx.send(
-            "❌ Could not play the audio."
+            f"❌ Test failed:\n```{str(e)[:1000]}```"
         )
 
 
 # =========================
-# SOUNDCLOUD PLAY
+# PLAY
 # =========================
 
 @bot.command()
 @owner_only()
 async def play(ctx, *, query=None):
 
-    if not query:
-
-        await ctx.send(
-            "❌ Usage: `!play <song name>`"
-        )
-
-        return
-
     if not ctx.author.voice:
-
         await ctx.send(
             "❌ Join a voice channel first."
         )
+        return
 
+    if not query:
+        await ctx.send(
+            "❌ Use: `!play song name`"
+        )
         return
 
     channel = ctx.author.voice.channel
 
+    # =========================
+    # CONNECT
+    # =========================
+
     try:
 
-        # Connect or move
-        if ctx.voice_client:
+        voice = ctx.voice_client
 
-            voice = ctx.voice_client
-
-            if voice.channel != channel:
-                await voice.move_to(channel)
-
-        else:
-
+        if voice is None:
             voice = await channel.connect()
 
-        await ctx.send(
-            f"🔎 Searching SoundCloud for **{query}**..."
+        elif voice.channel != channel:
+            await voice.move_to(channel)
+
+    except Exception as e:
+
+        print(
+            "VOICE ERROR:",
+            repr(e)
         )
 
-        # yt-dlp options
-        ydl_options = {
-            "format": "bestaudio/best",
-            "noplaylist": True,
-            "quiet": True,
-            "default_search": "scsearch1"
-        }
+        await ctx.send(
+            "❌ I couldn't connect to the voice channel."
+        )
 
-        # Search SoundCloud
-        with yt_dlp.YoutubeDL(ydl_options) as ydl:
+        return
 
-            info = ydl.extract_info(
-                f"scsearch1:{query}",
-                download=False
-            )
+    # =========================
+    # STOP OLD AUDIO
+    # =========================
 
-        if not info:
+    if voice.is_playing():
+        voice.stop()
 
-            await ctx.send(
-                "❌ Nothing found."
-            )
+    await ctx.send(
+        f"🔎 Searching SoundCloud for **{query}**..."
+    )
 
-            return
+    # =========================
+    # YT-DLP
+    # =========================
 
-        # Get first result
-        if "entries" in info:
+    ydl_options = {
+        "format": "bestaudio/best",
+        "noplaylist": True,
+        "quiet": True,
+        "no_warnings": True,
+        "nocheckcertificate": True,
+        "source_address": "0.0.0.0"
+    }
 
-            entries = info.get("entries")
+    try:
 
-            if not entries:
+        loop = asyncio.get_running_loop()
 
-                await ctx.send(
-                    "❌ Nothing found."
+        def search_soundcloud():
+
+            with yt_dlp.YoutubeDL(
+                ydl_options
+            ) as ydl:
+
+                info = ydl.extract_info(
+                    f"scsearch1:{query}",
+                    download=False
                 )
 
-                return
+                if not info:
+                    raise Exception(
+                        "No SoundCloud result found."
+                    )
 
-            info = entries[0]
+                if "entries" in info:
 
-        audio_url = info.get("url")
+                    entries = info["entries"]
 
-        title = info.get(
-            "title",
-            "Unknown track"
+                    if not entries:
+                        raise Exception(
+                            "No SoundCloud result found."
+                        )
+
+                    info = entries[0]
+
+                audio_url = info.get("url")
+
+                if not audio_url:
+                    raise Exception(
+                        "No playable audio URL found."
+                    )
+
+                return {
+                    "url": audio_url,
+                    "title": info.get(
+                        "title",
+                        "Unknown"
+                    )
+                }
+
+        data = await loop.run_in_executor(
+            None,
+            search_soundcloud
         )
 
-        if not audio_url:
+        audio_url = data["url"]
+        title = data["title"]
 
-            await ctx.send(
-                "❌ Could not get the audio stream."
-            )
+        print(
+            "AUDIO URL FOUND"
+        )
 
-            return
+        print(
+            "TITLE:",
+            title
+        )
 
-        # Stop current audio
-        if voice.is_playing():
-            voice.stop()
+        # =========================
+        # FFMPEG AUDIO CONVERSION
+        # =========================
 
-        # FFmpeg options
         ffmpeg_options = {
-
             "before_options": (
                 "-reconnect 1 "
                 "-reconnect_streamed 1 "
                 "-reconnect_delay_max 5"
             ),
-
-            "options": "-vn"
+            "options": (
+                "-vn "
+                "-f s16le "
+                "-ar 48000 "
+                "-ac 2"
+            )
         }
 
-        # Audio source
         source = discord.FFmpegPCMAudio(
             audio_url,
             executable=FFMPEG_PATH,
             **ffmpeg_options
         )
 
-        # Play
+        # =========================
+        # CALLBACK
+        # =========================
+
+        def after_play(error):
+
+            if error:
+
+                print(
+                    "AUDIO PLAY ERROR:",
+                    repr(error)
+                )
+
+            else:
+
+                print(
+                    "AUDIO FINISHED"
+                )
+
+        # =========================
+        # PLAY
+        # =========================
+
         voice.play(
             source,
-            after=lambda error: print(
-                f"SoundCloud finished. Error: {error}"
-            )
+            after=after_play
         )
 
         await ctx.send(
@@ -389,7 +404,32 @@ async def play(ctx, *, query=None):
         )
 
         await ctx.send(
-            "❌ Could not play that SoundCloud track."
+            "❌ **Play failed.**\n"
+            f"```{str(e)[:1500]}```"
+        )
+
+
+# =========================
+# STOP
+# =========================
+
+@bot.command()
+@owner_only()
+async def stop(ctx):
+
+    if (
+        ctx.voice_client
+        and ctx.voice_client.is_playing()
+    ):
+
+        ctx.voice_client.stop()
+
+        await ctx.send("⏹️ Stopped.")
+
+    else:
+
+        await ctx.send(
+            "❌ Nothing is playing."
         )
 
 
@@ -408,9 +448,7 @@ async def pause(ctx):
 
         ctx.voice_client.pause()
 
-        await ctx.send(
-            "⏸️ **Paused.**"
-        )
+        await ctx.send("⏸️ Paused.")
 
     else:
 
@@ -434,45 +472,17 @@ async def resume(ctx):
 
         ctx.voice_client.resume()
 
-        await ctx.send(
-            "▶️ **Resumed.**"
-        )
+        await ctx.send("▶️ Resumed.")
 
     else:
 
         await ctx.send(
-            "❌ Nothing is paused."
+            "❌ Audio isn't paused."
         )
 
 
 # =========================
-# STOP
-# =========================
-
-@bot.command()
-@owner_only()
-async def stop(ctx):
-
-    if (
-        ctx.voice_client
-        and ctx.voice_client.is_playing()
-    ):
-
-        ctx.voice_client.stop()
-
-        await ctx.send(
-            "⏹️ **Stopped.**"
-        )
-
-    else:
-
-        await ctx.send(
-            "❌ Nothing is playing."
-        )
-
-
-# =========================
-# LEAVE VOICE
+# LEAVE
 # =========================
 
 @bot.command()
@@ -484,56 +494,18 @@ async def leave(ctx):
         await ctx.voice_client.disconnect()
 
         await ctx.send(
-            "👋 **Izuna left the voice channel.**"
+            "👋 Izuna left the voice channel."
         )
 
     else:
 
         await ctx.send(
-            "❌ Izuna isn't in a voice channel."
+            "❌ I'm not in a voice channel."
         )
 
 
 # =========================
-# HELP
-# =========================
-
-@bot.command()
-@owner_only()
-async def help(ctx):
-
-    embed = discord.Embed(
-        title="🎵 Izuna Commands",
-        description="Owner-only music controls",
-        color=discord.Color.blurple()
-    )
-
-    embed.add_field(
-        name="🔊 Voice",
-        value=(
-            "`!join` — Join your voice channel\n"
-            "`!leave` — Leave voice channel"
-        ),
-        inline=False
-    )
-
-    embed.add_field(
-        name="🎵 Music",
-        value=(
-            "`!testsound` — Play Izuna's local audio\n"
-            "`!play <song>` — Search SoundCloud\n"
-            "`!pause` — Pause\n"
-            "`!resume` — Resume\n"
-            "`!stop` — Stop"
-        ),
-        inline=False
-    )
-
-    await ctx.send(embed=embed)
-
-
-# =========================
-# COMMAND ERROR HANDLER
+# ERRORS
 # =========================
 
 @bot.event
@@ -558,22 +530,21 @@ async def on_command_error(ctx, error):
 
 
 # =========================
-# DISCORD TOKEN
+# START
 # =========================
 
-TOKEN = os.environ.get(
+TOKEN = os.getenv(
     "DISCORD_TOKEN"
 )
 
 if not TOKEN:
 
     raise RuntimeError(
-        "DISCORD_TOKEN environment variable is missing."
+        "DISCORD_TOKEN is not configured."
     )
 
-
-# =========================
-# START BOT
-# =========================
+print(
+    "🚀 Starting Izuna..."
+)
 
 bot.run(TOKEN)
