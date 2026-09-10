@@ -33,11 +33,10 @@ def start_web_server():
         HealthHandler
     )
 
-    print(f"🌐 Web server running on port {port}")
+    print(f"Web server running on port {port}")
     server.serve_forever()
 
 
-# Start Render web server in background
 threading.Thread(
     target=start_web_server,
     daemon=True
@@ -62,13 +61,13 @@ FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 # =========================
-# BOT READY
+# READY
 # =========================
 
 @bot.event
 async def on_ready():
-    print(f"✅ Izuna is online as {bot.user}")
-    print(f"🆔 Bot ID: {bot.user.id}")
+    print(f"IZUNA ONLINE: {bot.user}")
+    print(f"Bot ID: {bot.user.id}")
 
 
 # =========================
@@ -80,51 +79,66 @@ def moderator_only():
 
 
 # =========================
-# JOIN VOICE
+# JOIN
 # =========================
 
 @bot.command()
 @moderator_only()
 async def join(ctx):
 
-    if ctx.author.voice is None:
+    if not ctx.author.voice:
         await ctx.send("❌ Join a voice channel first.")
         return
 
     channel = ctx.author.voice.channel
 
-    if ctx.voice_client:
-        await ctx.voice_client.move_to(channel)
-    else:
-        await channel.connect()
+    try:
+        if ctx.voice_client:
+            await ctx.voice_client.move_to(channel)
+        else:
+            await channel.connect()
 
-    await ctx.send(f"🔊 Joined **{channel.name}**!")
+        await ctx.send(f"🔊 Izuna joined **{channel.name}**!")
+
+    except Exception as e:
+        print("JOIN ERROR:", repr(e))
+        await ctx.send(f"❌ Could not join voice: `{e}`")
 
 
 # =========================
-# PLAY MUSIC / SOUND
+# PLAY
 # =========================
 
 @bot.command()
 @moderator_only()
 async def play(ctx, *, query=None):
 
-    if ctx.author.voice is None:
+    if not ctx.author.voice:
         await ctx.send("❌ Join a voice channel first.")
         return
 
-    if query is None:
-        await ctx.send("❌ Use: `!play song name or YouTube URL`")
+    if not query:
+        await ctx.send("❌ Use: `!play song name`")
         return
 
-    voice = ctx.voice_client
+    channel = ctx.author.voice.channel
 
-    if voice is None:
-        voice = await ctx.author.voice.channel.connect()
+    # Connect to voice
+    try:
+        voice = ctx.voice_client
 
-    elif voice.channel != ctx.author.voice.channel:
-        await voice.move_to(ctx.author.voice.channel)
+        if voice is None:
+            voice = await channel.connect()
 
+        elif voice.channel != channel:
+            await voice.move_to(channel)
+
+    except Exception as e:
+        print("VOICE ERROR:", repr(e))
+        await ctx.send("❌ I couldn't connect to the voice channel.")
+        return
+
+    # Stop previous audio
     if voice.is_playing():
         voice.stop()
 
@@ -136,36 +150,49 @@ async def play(ctx, *, query=None):
         "default_search": "ytsearch1",
         "quiet": True,
         "no_warnings": True,
+        "nocheckcertificate": True,
+        "source_address": "0.0.0.0",
     }
 
     try:
 
         loop = asyncio.get_running_loop()
 
-        def get_audio():
+        def search_youtube():
 
             with yt_dlp.YoutubeDL(ydl_options) as ydl:
 
                 info = ydl.extract_info(
-                    query,
+                    f"ytsearch1:{query}",
                     download=False
                 )
 
+                if not info:
+                    raise Exception("No result found.")
+
                 if "entries" in info:
-                    info = info["entries"][0]
+                    entries = info["entries"]
 
-                return info
+                    if not entries:
+                        raise Exception("No YouTube result found.")
 
-        info = await loop.run_in_executor(
+                    info = entries[0]
+
+                return {
+                    "url": info["url"],
+                    "title": info.get("title", "Unknown")
+                }
+
+        data = await loop.run_in_executor(
             None,
-            get_audio
+            search_youtube
         )
 
-        audio_url = info["url"]
-        title = info.get(
-            "title",
-            "Unknown"
-        )
+        audio_url = data["url"]
+        title = data["title"]
+
+        print("AUDIO URL FOUND")
+        print("TITLE:", title)
 
         ffmpeg_options = {
             "before_options": (
@@ -182,18 +209,26 @@ async def play(ctx, *, query=None):
             **ffmpeg_options
         )
 
-        voice.play(source)
+        def after_play(error):
+
+            if error:
+                print("AUDIO PLAY ERROR:", repr(error))
+
+        voice.play(
+            source,
+            after=after_play
+        )
 
         await ctx.send(
-            f"🎵 Now playing: **{title}**"
+            f"🎵 **Now playing:** {title}"
         )
 
     except Exception as e:
 
-        print(f"PLAY ERROR: {e}")
+        print("PLAY ERROR:", repr(e))
 
         await ctx.send(
-            "❌ I couldn't play that audio."
+            f"❌ Play failed.\n```{str(e)[:1500]}```"
         )
 
 
@@ -205,35 +240,15 @@ async def play(ctx, *, query=None):
 @moderator_only()
 async def stop(ctx):
 
-    if (
-        ctx.voice_client
-        and ctx.voice_client.is_playing()
-    ):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+
         ctx.voice_client.stop()
-        await ctx.send("⏹️ Stopped the audio.")
+
+        await ctx.send("⏹️ Stopped.")
 
     else:
+
         await ctx.send("❌ Nothing is playing.")
-
-
-# =========================
-# LEAVE VOICE
-# =========================
-
-@bot.command()
-@moderator_only()
-async def leave(ctx):
-
-    if ctx.voice_client:
-        await ctx.voice_client.disconnect()
-        await ctx.send(
-            "👋 Izuna left the voice channel."
-        )
-
-    else:
-        await ctx.send(
-            "❌ I'm not in a voice channel."
-        )
 
 
 # =========================
@@ -244,17 +259,15 @@ async def leave(ctx):
 @moderator_only()
 async def pause(ctx):
 
-    if (
-        ctx.voice_client
-        and ctx.voice_client.is_playing()
-    ):
+    if ctx.voice_client and ctx.voice_client.is_playing():
+
         ctx.voice_client.pause()
+
         await ctx.send("⏸️ Paused.")
 
     else:
-        await ctx.send(
-            "❌ Nothing is playing."
-        )
+
+        await ctx.send("❌ Nothing is playing.")
 
 
 # =========================
@@ -265,63 +278,70 @@ async def pause(ctx):
 @moderator_only()
 async def resume(ctx):
 
-    if (
-        ctx.voice_client
-        and ctx.voice_client.is_paused()
-    ):
+    if ctx.voice_client and ctx.voice_client.is_paused():
+
         ctx.voice_client.resume()
+
         await ctx.send("▶️ Resumed.")
 
     else:
-        await ctx.send(
-            "❌ Audio isn't paused."
-        )
+
+        await ctx.send("❌ Audio isn't paused.")
 
 
 # =========================
-# COMMAND ERROR
+# LEAVE
+# =========================
+
+@bot.command()
+@moderator_only()
+async def leave(ctx):
+
+    if ctx.voice_client:
+
+        await ctx.voice_client.disconnect()
+
+        await ctx.send("👋 Izuna left the voice channel.")
+
+    else:
+
+        await ctx.send("❌ I'm not in a voice channel.")
+
+
+# =========================
+# ERRORS
 # =========================
 
 @bot.event
 async def on_command_error(ctx, error):
 
-    if isinstance(
-        error,
-        commands.MissingPermissions
-    ):
+    if isinstance(error, commands.MissingPermissions):
 
         await ctx.send(
-            "🛡️ **Moderator only.** "
-            "You don't have permission "
-            "to use this command."
+            "🛡️ **Moderator only.**"
         )
 
-    elif isinstance(
-        error,
-        commands.CommandNotFound
-    ):
+    elif isinstance(error, commands.CommandNotFound):
 
         pass
 
     else:
 
         print(
-            f"ERROR: {error}"
+            "COMMAND ERROR:",
+            repr(error)
         )
 
 
 # =========================
-# START BOT
+# START
 # =========================
 
-TOKEN = os.getenv(
-    "DISCORD_TOKEN"
-)
+TOKEN = os.getenv("DISCORD_TOKEN")
 
 if not TOKEN:
-
     raise RuntimeError(
-        "❌ DISCORD_TOKEN is not configured."
+        "DISCORD_TOKEN is not configured."
     )
 
 print("🚀 Starting Izuna...")
