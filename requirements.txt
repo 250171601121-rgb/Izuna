@@ -1,3 +1,4 @@
 discord.py
 PyNaCl
-requests
+yt-dlp
+imageio-ffmpeg
