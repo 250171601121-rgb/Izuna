@@ -10,6 +10,13 @@ import imageio_ffmpeg
 
 
 # =========================
+# YOUR DISCORD USER ID
+# =========================
+
+OWNER_ID = 1323235462281957457
+
+
+# =========================
 # RENDER WEB SERVER
 # =========================
 
@@ -34,7 +41,7 @@ def start_web_server():
         HealthHandler
     )
 
-    print(f"🌐 Web server running on port {port}")
+    print(f"Web server running on port {port}")
 
     server.serve_forever()
 
@@ -70,19 +77,29 @@ FFMPEG_PATH = imageio_ffmpeg.get_ffmpeg_exe()
 @bot.event
 async def on_ready():
 
-    print(f"✅ IZUNA ONLINE: {bot.user}")
-    print(f"🆔 Bot ID: {bot.user.id}")
+    print(f"IZUNA ONLINE: {bot.user}")
+    print(f"Bot ID: {bot.user.id}")
+    print(f"Owner ID: {OWNER_ID}")
 
 
 # =========================
-# MODERATOR CHECK
+# OWNER-ONLY CHECK
 # =========================
 
-def moderator_only():
+def owner_only():
 
-    return commands.has_permissions(
-        manage_messages=True
-    )
+    async def predicate(ctx):
+
+        if ctx.author.id == OWNER_ID:
+            return True
+
+        await ctx.send(
+            "🛡️ **Izuna is controlled by its owner only.**"
+        )
+
+        return False
+
+    return commands.check(predicate)
 
 
 # =========================
@@ -90,7 +107,7 @@ def moderator_only():
 # =========================
 
 @bot.command()
-@moderator_only()
+@owner_only()
 async def join(ctx):
 
     if not ctx.author.voice:
@@ -130,14 +147,13 @@ async def join(ctx):
 
 
 # =========================
-# PLAY SOUNDCloud MUSIC
+# PLAY SOUNDCLOUD MUSIC
 # =========================
 
 @bot.command()
-@moderator_only()
+@owner_only()
 async def play(ctx, *, query=None):
 
-    # Check if user is in voice
     if not ctx.author.voice:
 
         await ctx.send(
@@ -146,7 +162,6 @@ async def play(ctx, *, query=None):
 
         return
 
-    # Check search text
     if not query:
 
         await ctx.send(
@@ -187,7 +202,7 @@ async def play(ctx, *, query=None):
         return
 
     # =========================
-    # STOP CURRENT MUSIC
+    # STOP CURRENT AUDIO
     # =========================
 
     if voice.is_playing():
@@ -203,17 +218,11 @@ async def play(ctx, *, query=None):
     # =========================
 
     ydl_options = {
-
         "format": "bestaudio/best",
-
         "noplaylist": True,
-
         "quiet": True,
-
         "no_warnings": True,
-
-        "nocheckcertificate": True
-
+        "nocheckcertificate": True,
     }
 
     # =========================
@@ -241,7 +250,6 @@ async def play(ctx, *, query=None):
                         "No SoundCloud result found."
                     )
 
-                # Search results
                 if "entries" in info:
 
                     entries = info["entries"]
@@ -262,20 +270,12 @@ async def play(ctx, *, query=None):
                         "No playable audio URL found."
                     )
 
-                title = info.get(
-                    "title",
-                    "Unknown"
-                )
-
-                webpage_url = info.get(
-                    "webpage_url",
-                    ""
-                )
-
                 return {
                     "url": audio_url,
-                    "title": title,
-                    "webpage_url": webpage_url
+                    "title": info.get(
+                        "title",
+                        "Unknown"
+                    )
                 }
 
         data = await loop.run_in_executor(
@@ -284,42 +284,28 @@ async def play(ctx, *, query=None):
         )
 
         audio_url = data["url"]
-
         title = data["title"]
 
-        print(
-            "🎵 AUDIO URL FOUND"
-        )
-
-        print(
-            "TITLE:",
-            title
-        )
+        print("AUDIO URL FOUND")
+        print("TITLE:", title)
 
         # =========================
-        # FFMPEG SETTINGS
+        # FFMPEG
         # =========================
 
         ffmpeg_options = {
-
             "before_options": (
                 "-reconnect 1 "
                 "-reconnect_streamed 1 "
                 "-reconnect_delay_max 5"
             ),
-
             "options": "-vn"
-
         }
 
         source = discord.FFmpegPCMAudio(
-
             audio_url,
-
             executable=FFMPEG_PATH,
-
             **ffmpeg_options
-
         )
 
         # =========================
@@ -331,14 +317,14 @@ async def play(ctx, *, query=None):
             if error:
 
                 print(
-                    "🔴 AUDIO PLAY ERROR:",
+                    "AUDIO PLAY ERROR:",
                     repr(error)
                 )
 
             else:
 
                 print(
-                    "✅ Audio finished."
+                    "Audio finished."
                 )
 
         # =========================
@@ -357,7 +343,7 @@ async def play(ctx, *, query=None):
     except Exception as e:
 
         print(
-            "❌ PLAY ERROR:",
+            "PLAY ERROR:",
             repr(e)
         )
 
@@ -372,7 +358,7 @@ async def play(ctx, *, query=None):
 # =========================
 
 @bot.command()
-@moderator_only()
+@owner_only()
 async def stop(ctx):
 
     if (
@@ -398,7 +384,7 @@ async def stop(ctx):
 # =========================
 
 @bot.command()
-@moderator_only()
+@owner_only()
 async def pause(ctx):
 
     if (
@@ -424,7 +410,7 @@ async def pause(ctx):
 # =========================
 
 @bot.command()
-@moderator_only()
+@owner_only()
 async def resume(ctx):
 
     if (
@@ -450,7 +436,7 @@ async def resume(ctx):
 # =========================
 
 @bot.command()
-@moderator_only()
+@owner_only()
 async def leave(ctx):
 
     if ctx.voice_client:
@@ -473,26 +459,21 @@ async def leave(ctx):
 # =========================
 
 @bot.event
-async def on_command_error(
-    ctx,
-    error
-):
+async def on_command_error(ctx, error):
 
     if isinstance(
         error,
-        commands.MissingPermissions
+        commands.CheckFailure
     ):
 
-        await ctx.send(
-            "🛡️ **Moderator only.**"
-        )
+        return
 
     elif isinstance(
         error,
         commands.CommandNotFound
     ):
 
-        pass
+        return
 
     else:
 
@@ -517,9 +498,6 @@ if not TOKEN:
     )
 
 
-print(
-    "🚀 Starting Izuna..."
-)
-
+print("Starting Izuna...")
 
 bot.run(TOKEN)
