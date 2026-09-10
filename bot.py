@@ -1,4 +1,3 @@
-```python
 import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -32,7 +31,6 @@ class HealthHandler(BaseHTTPRequestHandler):
 
 
 def start_web_server():
-
     port = int(os.environ.get("PORT", 10000))
 
     server = HTTPServer(
@@ -67,12 +65,12 @@ bot = commands.Bot(
 
 
 # =========================
-# SPOTIFY SETTINGS
+# SPOTIFY
 # =========================
 
-SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-SPOTIFY_ACCESS_TOKEN = os.getenv("SPOTIFY_ACCESS_TOKEN")
+SPOTIFY_ACCESS_TOKEN = os.getenv(
+    "SPOTIFY_ACCESS_TOKEN"
+)
 
 
 # =========================
@@ -85,11 +83,6 @@ async def on_ready():
     print(f"IZUNA ONLINE: {bot.user}")
     print(f"Bot ID: {bot.user.id}")
     print(f"Owner ID: {OWNER_ID}")
-
-    if SPOTIFY_CLIENT_ID:
-        print("Spotify Client ID configured.")
-    else:
-        print("Spotify Client ID missing.")
 
     if SPOTIFY_ACCESS_TOKEN:
         print("Spotify access token configured.")
@@ -109,7 +102,7 @@ def owner_only():
             return True
 
         await ctx.send(
-            "🛡️ **Izuna is controlled by its owner only.**"
+            "🛡️ Izuna is controlled by its owner only."
         )
 
         return False
@@ -139,7 +132,7 @@ async def spotify(ctx, *, query=None):
 
     headers = {
         "Authorization":
-            f"Bearer {SPOTIFY_ACCESS_TOKEN}"
+        f"Bearer {SPOTIFY_ACCESS_TOKEN}"
     }
 
     params = {
@@ -159,26 +152,24 @@ async def spotify(ctx, *, query=None):
 
         if response.status_code != 200:
 
-            await ctx.send(
-                f"❌ Spotify search failed: "
-                f"`HTTP {response.status_code}`"
-            )
-
             print(
                 "SPOTIFY SEARCH ERROR:",
                 response.text
+            )
+
+            await ctx.send(
+                f"❌ Spotify search failed "
+                f"({response.status_code})."
             )
 
             return
 
         data = response.json()
 
-        tracks = data.get(
-            "tracks",
-            {}
-        ).get(
-            "items",
-            []
+        tracks = (
+            data
+            .get("tracks", {})
+            .get("items", [])
         )
 
         if not tracks:
@@ -198,7 +189,9 @@ async def spotify(ctx, *, query=None):
             for artist in track["artists"]
         )
 
-        spotify_url = track["external_urls"]["spotify"]
+        spotify_url = (
+            track["external_urls"]["spotify"]
+        )
 
         await ctx.send(
             "🎵 **Spotify Result**\n\n"
@@ -215,12 +208,12 @@ async def spotify(ctx, *, query=None):
         )
 
         await ctx.send(
-            "❌ Spotify error."
+            "❌ Spotify error occurred."
         )
 
 
 # =========================
-# PLAY ON SPOTIFY
+# SPOTIFY PLAY
 # =========================
 
 @bot.command()
@@ -241,12 +234,11 @@ async def spotifyplay(ctx, *, query=None):
 
     headers = {
         "Authorization":
-            f"Bearer {SPOTIFY_ACCESS_TOKEN}",
+        f"Bearer {SPOTIFY_ACCESS_TOKEN}",
         "Content-Type":
-            "application/json"
+        "application/json"
     }
 
-    # Search
     params = {
         "q": query,
         "type": "track",
@@ -255,6 +247,7 @@ async def spotifyplay(ctx, *, query=None):
 
     try:
 
+        # Search Spotify
         search_response = requests.get(
             "https://api.spotify.com/v1/search",
             headers=headers,
@@ -264,24 +257,23 @@ async def spotifyplay(ctx, *, query=None):
 
         if search_response.status_code != 200:
 
-            await ctx.send(
-                "❌ Spotify search failed."
+            print(
+                "SEARCH ERROR:",
+                search_response.text
             )
 
-            print(
-                search_response.text
+            await ctx.send(
+                "❌ Spotify search failed."
             )
 
             return
 
         data = search_response.json()
 
-        tracks = data.get(
-            "tracks",
-            {}
-        ).get(
-            "items",
-            []
+        tracks = (
+            data
+            .get("tracks", {})
+            .get("items", [])
         )
 
         if not tracks:
@@ -295,7 +287,6 @@ async def spotifyplay(ctx, *, query=None):
         track = tracks[0]
 
         track_uri = track["uri"]
-
         name = track["name"]
 
         artists = ", ".join(
@@ -303,7 +294,9 @@ async def spotifyplay(ctx, *, query=None):
             for artist in track["artists"]
         )
 
-        spotify_url = track["external_urls"]["spotify"]
+        spotify_url = (
+            track["external_urls"]["spotify"]
+        )
 
         # Start Spotify playback
         play_response = requests.put(
@@ -327,28 +320,27 @@ async def spotifyplay(ctx, *, query=None):
         elif play_response.status_code == 403:
 
             await ctx.send(
-                "❌ Spotify requires a Premium account "
+                "❌ Spotify Premium is required "
                 "for playback control."
             )
 
         elif play_response.status_code == 404:
 
             await ctx.send(
-                "❌ No active Spotify device found.\n\n"
-                "Open Spotify on your phone or PC "
-                "and start a Spotify device first."
+                "❌ No active Spotify device found.\n"
+                "Open Spotify and select a device first."
             )
 
         else:
 
-            await ctx.send(
-                f"❌ Spotify playback failed.\n"
-                f"HTTP `{play_response.status_code}`"
-            )
-
             print(
                 "PLAYBACK ERROR:",
                 play_response.text
+            )
+
+            await ctx.send(
+                f"❌ Spotify playback failed "
+                f"({play_response.status_code})."
             )
 
     except Exception as e:
@@ -364,7 +356,7 @@ async def spotifyplay(ctx, *, query=None):
 
 
 # =========================
-# PAUSE SPOTIFY
+# SPOTIFY PAUSE
 # =========================
 
 @bot.command()
@@ -372,16 +364,14 @@ async def spotifyplay(ctx, *, query=None):
 async def spotify_pause(ctx):
 
     if not SPOTIFY_ACCESS_TOKEN:
-
         await ctx.send(
             "❌ Spotify access token is missing."
         )
-
         return
 
     headers = {
         "Authorization":
-            f"Bearer {SPOTIFY_ACCESS_TOKEN}"
+        f"Bearer {SPOTIFY_ACCESS_TOKEN}"
     }
 
     response = requests.put(
@@ -399,13 +389,12 @@ async def spotify_pause(ctx):
     else:
 
         await ctx.send(
-            f"❌ Could not pause Spotify. "
-            f"HTTP `{response.status_code}`"
+            "❌ Could not pause Spotify."
         )
 
 
 # =========================
-# RESUME SPOTIFY
+# SPOTIFY RESUME
 # =========================
 
 @bot.command()
@@ -413,16 +402,14 @@ async def spotify_pause(ctx):
 async def spotify_resume(ctx):
 
     if not SPOTIFY_ACCESS_TOKEN:
-
         await ctx.send(
             "❌ Spotify access token is missing."
         )
-
         return
 
     headers = {
         "Authorization":
-            f"Bearer {SPOTIFY_ACCESS_TOKEN}"
+        f"Bearer {SPOTIFY_ACCESS_TOKEN}"
     }
 
     response = requests.put(
@@ -440,13 +427,12 @@ async def spotify_resume(ctx):
     else:
 
         await ctx.send(
-            f"❌ Could not resume Spotify. "
-            f"HTTP `{response.status_code}`"
+            "❌ Could not resume Spotify."
         )
 
 
 # =========================
-# NEXT SONG
+# SPOTIFY NEXT
 # =========================
 
 @bot.command()
@@ -454,16 +440,14 @@ async def spotify_resume(ctx):
 async def spotify_next(ctx):
 
     if not SPOTIFY_ACCESS_TOKEN:
-
         await ctx.send(
             "❌ Spotify access token is missing."
         )
-
         return
 
     headers = {
         "Authorization":
-            f"Bearer {SPOTIFY_ACCESS_TOKEN}"
+        f"Bearer {SPOTIFY_ACCESS_TOKEN}"
     }
 
     response = requests.post(
@@ -475,14 +459,13 @@ async def spotify_next(ctx):
     if response.status_code == 204:
 
         await ctx.send(
-            "⏭️ Skipped to next song."
+            "⏭️ Next Spotify song."
         )
 
     else:
 
         await ctx.send(
-            f"❌ Could not skip. "
-            f"HTTP `{response.status_code}`"
+            "❌ Could not skip the song."
         )
 
 
@@ -530,4 +513,3 @@ print(
 )
 
 bot.run(TOKEN)
-```
